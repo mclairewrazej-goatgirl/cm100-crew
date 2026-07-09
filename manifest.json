@@ -1,0 +1,18 @@
+{
+  "name": "CM100 Crew Planner",
+  "short_name": "CM100",
+  "description": "Crazy Mountain 100 race day crew planning and live tracking",
+  "start_url": "/cm100-crew/",
+  "display": "standalone",
+  "background_color": "#0F1F2A",
+  "theme_color": "#0F1F2A",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230F1F2A'/><text y='68' x='50' text-anchor='middle' font-size='55'>⛰️</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

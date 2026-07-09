@@ -1,0 +1,2093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0F1F2A">
+<title>CM100 Crew Planner</title>
+<link rel="manifest" href="manifest.json">
+<script>
+  // Register service worker for offline support
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(()=>{});
+    });
+  }
+</script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  :root{
+    --bg:#0F1F2A;--card:#162838;--card2:#1C3347;
+    --teal:#2DD4BF;--amber:#F59E0B;--red:#EF4444;
+    --blue:#60A5FA;--green:#34D399;--purple:#A78BFA;
+    --muted:#94A3B8;--text:#E2E8F0;--dim:#CBD5E1;
+    --crew:#1E3A5F;--remote:#2D1F0A;--warn:#3B0F0F;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh;padding-bottom:80px}
+  /* HEADER */
+  #header{background:var(--card);border-bottom:1px solid #fff2;padding:12px 16px 8px;position:sticky;top:0;z-index:100}
+  #header .eyebrow{font-size:10px;color:var(--teal);font-weight:800;letter-spacing:2px;text-transform:uppercase}
+  #header h1{font-size:17px;font-weight:900;line-height:1.2}
+  #header .sub{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:8px;margin-top:2px}
+  #sync-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);display:inline-block;flex-shrink:0}
+  #sync-dot.ok{background:var(--green)}
+  #sync-dot.err{background:var(--red)}
+  #sync-dot.spin{background:var(--amber);animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  /* TABS */
+  #tabs{display:flex;background:var(--card);border-bottom:1px solid #fff1;overflow-x:auto;scrollbar-width:none;position:sticky;top:58px;z-index:99}
+  #tabs::-webkit-scrollbar{display:none}
+  .tab{flex:1;min-width:52px;padding:8px 4px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:9px;font-weight:500;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;white-space:nowrap}
+  .tab.active{border-bottom-color:var(--teal);color:var(--teal);font-weight:800}
+  .tab .icon{font-size:14px}
+  /* CONTENT */
+  #content{padding:14px 14px 20px;max-width:560px;margin:0 auto}
+  /* SETUP BANNER */
+  #setup-banner{background:#1a2a1a;border:1px solid var(--green);border-radius:10px;padding:14px;margin-bottom:16px}
+  #setup-banner h3{color:var(--green);font-size:13px;margin-bottom:8px}
+  #setup-banner p{color:var(--dim);font-size:11px;line-height:1.6;margin-bottom:8px}
+  #setup-banner code{background:#0F1F2A;color:var(--teal);padding:2px 6px;border-radius:4px;font-size:11px}
+  /* CARDS */
+  .card{background:var(--card);border-radius:10px;border:1px solid #fff2;margin-bottom:10px;overflow:hidden}
+  .card.crew{background:var(--crew);border-color:#2563EB}
+  .card.remote{background:var(--remote);border-color:#D97706}
+  .card.warn{background:var(--warn);border-color:var(--red)}
+  .card.priority{background:#1E3A5Fcc;border-color:var(--teal)}
+  /* ROWS */
+  .row{display:flex;justify-content:space-between;align-items:flex-start;padding:5px 12px;border-bottom:1px solid #fff1;font-size:11px}
+  .row .lbl{color:var(--muted);flex-shrink:0;padding-right:8px}
+  .row .val{color:var(--text);font-weight:600;text-align:right}
+  /* SECTION HEAD */
+  .sh{margin:18px 0 8px;padding:6px 12px;border-left:3px solid var(--teal);background:#2DD4BF18;border-radius:0 6px 6px 0;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--teal);text-transform:uppercase}
+  .sh.amber{border-color:var(--amber);background:#F59E0B18;color:var(--amber)}
+  .sh.red{border-color:var(--red);background:#EF444418;color:var(--red)}
+  .sh.green{border-color:var(--green);background:#34D39918;color:var(--green)}
+  /* BADGE */
+  .badge{display:inline-block;padding:1px 7px;border-radius:99px;font-size:10px;font-weight:700}
+  /* BUTTONS */
+  .btn{background:#2DD4BF22;border:1px solid var(--teal);color:var(--teal);border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit}
+  .btn.sm{padding:4px 10px;font-size:11px}
+  .btn.amber{background:#F59E0B22;border-color:var(--amber);color:var(--amber)}
+  .btn.red{background:#EF444422;border-color:var(--red);color:var(--red)}
+  .btn.green{background:#34D39922;border-color:var(--green);color:var(--green)}
+  .btn.muted{background:#fff1;border-color:#fff3;color:var(--muted)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  /* INPUTS */
+  input,select,textarea{background:#0F1F2A;border:1px solid #fff3;border-radius:6px;color:var(--text);padding:7px 10px;font-size:12px;font-family:inherit;outline:none;width:100%}
+  input:focus,select:focus,textarea:focus{border-color:var(--teal)}
+  select option{background:#162838}
+  label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px}
+  .field{margin-bottom:12px}
+  /* AID STATION CARDS */
+  .as-card{border-radius:10px;margin-bottom:8px;overflow:hidden;cursor:pointer}
+  .as-header{padding:10px 12px;display:flex;align-items:center;gap:10px}
+  .as-mile{min-width:42px;text-align:center}
+  .as-mile .mi{font-size:15px;font-weight:800}
+  .as-mile .lbl{font-size:9px;color:var(--muted)}
+  .as-body{flex:1}
+  .as-body .name{font-weight:700;font-size:13px}
+  .as-body .sub{font-size:10px;font-weight:600;margin-top:1px}
+  .as-body .cutoff{font-size:10px;color:var(--muted);margin-top:2px}
+  .as-badges{display:flex;flex-direction:column;gap:3px;align-items:flex-end}
+  .as-detail{border-top:1px solid #fff1;padding-bottom:4px}
+  .as-section{padding:7px 12px;font-size:11px;color:var(--dim);border-top:1px solid #fff1;line-height:1.6}
+  .as-section .lbl{font-size:10px;font-weight:700;margin-bottom:3px}
+  /* LEG CARDS */
+  .leg-card{border-radius:10px;margin-bottom:7px;padding:10px 12px;cursor:pointer;display:flex;gap:10px;align-items:flex-start}
+  .leg-miles{min-width:40px;text-align:center;padding-top:2px}
+  .leg-miles .from{font-size:11px;font-weight:800;color:var(--muted)}
+  .leg-miles .arr{font-size:9px;color:var(--muted);line-height:1.4}
+  .leg-miles .to{font-size:14px;font-weight:800;line-height:1}
+  .leg-miles .dist{font-size:8px;color:var(--muted)}
+  .leg-content{flex:1;min-width:0}
+  .leg-name{font-weight:700;font-size:12px}
+  .leg-tags{display:flex;flex-wrap:wrap;gap:3px;margin:4px 0}
+  .tag{font-size:9px;border-radius:4px;padding:1px 5px;border:1px solid}
+  .leg-items{display:flex;flex-wrap:wrap;gap:3px;margin-top:2px}
+  .leg-cal{text-align:right;flex-shrink:0}
+  .leg-cal .cal{font-size:13px;font-weight:800;color:var(--amber)}
+  .leg-cal .lbl{font-size:9px;color:var(--muted)}
+  /* ITEM CARDS */
+  .item-card{background:var(--card);border-radius:8px;padding:9px 12px;margin-bottom:5px;display:flex;align-items:center;gap:8px}
+  .item-info{flex:1;min-width:0}
+  .item-name{font-weight:700;font-size:12px}
+  .item-meta{font-size:10px;color:var(--muted)}
+  .item-note{font-size:10px;color:var(--muted);font-style:italic}
+  /* STEPPER */
+  .stepper{display:flex;align-items:center;gap:4px}
+  .step-btn{width:26px;height:26px;border-radius:5px;border:1px solid #fff3;background:#fff1;color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .step-val{min-width:20px;text-align:center;font-weight:700;font-size:13px}
+  /* TOTALS BAR */
+  .totals{display:flex;gap:6px;margin-bottom:10px}
+  .total-box{flex:1;border-radius:8px;padding:6px 8px;text-align:center;border:1px solid}
+  .total-box .val{font-size:13px;font-weight:800}
+  .total-box .lbl{font-size:9px;color:var(--muted)}
+  /* STRATEGY */
+  .target-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #fff1}
+  .target-row .lbl{flex:1;font-size:12px;color:var(--dim)}
+  .target-row input{width:80px;text-align:right}
+  .target-row .unit{font-size:11px;color:var(--muted);min-width:32px}
+  /* WARN BANNER */
+  .warn-banner{background:#3B0F0F;border:1px solid var(--red);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:var(--red);font-weight:700}
+  /* GEAR CHECKBOXES */
+  .check-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;margin-bottom:5px;cursor:pointer;border:1px solid}
+  .checkbox{width:20px;height:20px;border-radius:5px;border:2px solid;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+  /* TERRAIN NOTES */
+  .terrain-box{background:var(--card2);border-radius:8px;padding:8px 10px;margin-bottom:10px;border:1px solid #fff1}
+  .terrain-box .lbl{font-size:9px;color:var(--teal);font-weight:800;letter-spacing:1px;margin-bottom:5px}
+  /* OFFLINE TOAST */
+  #toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#162838;border:1px solid var(--teal);border-radius:8px;padding:8px 16px;font-size:12px;color:var(--teal);z-index:999;display:none;white-space:nowrap}
+  /* MODAL */
+  #modal-overlay{display:none;position:fixed;inset:0;background:#000a;z-index:200;align-items:flex-end}
+  #modal-overlay.open{display:flex}
+  #modal{background:var(--card);border-radius:16px 16px 0 0;padding:20px 16px 40px;width:100%;max-height:85vh;overflow-y:auto}
+  #modal h2{font-size:15px;font-weight:800;margin-bottom:14px}
+  /* GRID 2 */
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="eyebrow">Crazy Mountain 100</div>
+  <h1>Crew & Race Planner</h1>
+  <div class="sub">
+    <span id="sync-dot"></span>
+    <span id="sync-status">Not configured</span>
+    <span>· Jul 24, 2026 · 100mi · 23k ft</span>
+    <button id="unit-toggle" onclick="toggleUnits()" style="margin-left:4px;background:#2DD4BF18;border:1px solid #2DD4BF44;color:var(--teal);border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">mi/ft</button>
+  </div>
+</div>
+
+<div id="tabs">
+  <button class="tab active" data-tab="fuel" onclick="showTab('fuel')"><span class="icon">⛽</span>Fuel Plan</button>
+  <button class="tab" data-tab="pace" onclick="showTab('pace')"><span class="icon">⏱️</span>Pace</button>
+  <button class="tab" data-tab="db" onclick="showTab('db')"><span class="icon">🥗</span>Food DB</button>
+  <button class="tab" data-tab="strategy" onclick="showTab('strategy')"><span class="icon">📊</span>Strategy</button>
+  <button class="tab" data-tab="aid" onclick="showTab('aid')"><span class="icon">📍</span>Aid Stns</button>
+  <button class="tab" data-tab="gear" onclick="showTab('gear')"><span class="icon">🎒</span>Gear</button>
+  <button class="tab" data-tab="crew" onclick="showTab('crew')"><span class="icon">🚗</span>Crew</button>
+  <button class="tab" data-tab="admin" onclick="showTab('admin')"><span class="icon">✏️</span>Admin</button>
+  <button class="tab" data-tab="settings" onclick="showTab('settings')"><span class="icon">⚙️</span>Sync</button>
+</div>
+
+<div id="content"></div>
+<div id="toast"></div>
+
+<div id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div id="modal"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════
+const STATIONS = [
+  {name:"Start",sub:"Westling Ranch · Wilsall MT",mile:0,delta:"—",bag:true,crew:true,pacer:false,cutoff:"6:00 AM Fri",clock:"6:00 AM",type:"crew",
+   logistics:"Race starts in a field alongside Waltons Rd, Wilsall MT, just south of Porcupine Rd. Through the gate → left onto Waltons Rd (maintained gravel) → right onto Porcupine Rd → continue straight as road turns to unmaintained forest road and climbs south toward Porcupine Forest Cabin. Drop bags due Thu 3–7 PM at Berg Ranch (finish).",
+   food:"Pre-race breakfast, coffee. Load vest and top off water.",gear:"Full gear check. GPX downloaded. Poles if using."},
+  {name:"Porcupine",mile:6.1,delta:6.1,bag:false,crew:false,pacer:false,cutoff:"—",clock:"~7:00 AM",type:"remote",
+   logistics:"No crew. Continues on the new Porcupine-Ibex Trail — most runnable terrain on the course. Mixture of nice dirt, occasional downfall, rocks and roots. Side-hills the mountain with short high points. Several water crossings, most can be done dry but weather-dependent. ⚠️ REFILL WATER HERE — people run out before Ibex. Continuing: singletrack eventually ends at trailhead, turn right down forest road to Ibex Forest Cabin.",
+   food:"Gels. Top off water — mandatory refill point.",gear:"—"},
+  {name:"Ibex",mile:19.4,delta:13.3,bag:true,crew:true,pacer:false,cutoff:"1:00 PM Fri",clock:"~9:30 AM",type:"crew",
+   logistics:"Ibex Forest Cabin. Crew accessible by road. Drop bag available. Leaving: up forest road, past trailhead parking → left onto trail 271 (bypasses road) → steep ascent on two-track → opens to unmaintained forest two-track → right through gate, runnable rutted descent → meets trail 268 (wide, pleasant, rolling) → cross Cottonwood Creek bridge → immediate LEFT onto trail 268 up Trespass Creek. Then: 2,700ft climb over 5 miles to pass above Campfire Lake. Many water crossings and filter spots at base of pass. Trail becomes rock/shale/exposed with switchbacks. ⚠️ ESSENTIAL RIGHT TURN at natural lookout onto trail 123 (left onto trail 195 = wrong side of valley, ends up back at Porcupine — do not go left). Over the pass: loose scree descent, technical switchbacks, trail hard to see → stay on flagging past Campfire Lake (goats common here). Cross lake outlet on floating logs/rocks, head north down canyon. Middle Fork Sweet Grass Creek crossing WILL get feet wet. Long trail down to Cow Camp — you'll hear it before you see it.",
+   food:"Real food transition starts. Potatoes, broth, banana. Fill water well — big climb ahead.",gear:"Sunscreen reapply. Blister check. Water filter accessible."},
+  {name:"Cow Camp",sub:"FILL ALL WATER — 11.5mi to Halfmoon",mile:31.9,delta:12.5,bag:false,crew:false,pacer:false,cutoff:"—",clock:"~12:45 PM",type:"remote",
+   logistics:"Remote aid packed in by horse team — tell them how awesome they are! No drop allowed. On the way TO Halfmoon: stay on the SAME side of creek (do not cross). Head right through aid station and up trail 122 toward Conical Peak — second major climb. Singletrack along South Fork through trees, opens to grassy meadows with cairns. ⚠️ Look down AND ahead to stay on trail. 1 wet crossing ~1.8mi from CC guaranteed; others vary. Drainage narrows and steepens toward Glacier Lake — mostly exposed tundra. Trail hard to see — follow flagging closely. GPX essential. Cairn navigation to the pass — breathtaking views both directions. Over pass onto trail 119 toward Half-Moon canyon. Rocky/shale, switchbacks down to Twin Lakes (on right). Trail widens near Halfmoon trailhead → cross 2 bridges → right through parking lot to aid station.",
+   food:"⚠️ EAT BIG — next crew is Halfmoon (11.5mi). Potatoes, pizza, broth. Eat more than you think.",gear:"⚠️ FILL ALL WATER TO MAX CAPACITY. Filter ready. This is critical — long exposed climb with no reliable water."},
+  {name:"Halfmoon",sub:"★ FIRST PACER PICKUP",mile:43.4,delta:11.5,bag:true,crew:true,pacer:true,cutoff:"9:45 PM Fri",clock:"~4:30 PM",type:"crew",priority:true,
+   logistics:"Arrive at trailhead, right through parking lot. ~1h49m drive from finish. First pacer pickup. Leaving (Halfmoon → Cow Camp return): retrace in reverse — Conical Pass viewed twice each direction (epic). Trail 119 back over pass, rocky/shale. Rocky trail with bridges back to Cow Camp.",
+   food:"Major crew stop. Hot food — this is the last easy crew access for a while. Ginger chews start now.",gear:"⚠️ NIGHT GEAR STARTS HERE. Headlamp + spare batteries. Warm jacket/puffy. Long sleeve baselayer. Gloves. Night miles incoming."},
+  {name:"Conical Pass",sub:"Checkpoint only · cutoff tightened 2026",mile:50,delta:6.6,bag:false,crew:false,pacer:false,cutoff:"12:15 AM Sat",clock:"~7:30 PM",type:"warn",
+   logistics:"No crew. High alpine checkpoint only. ⚠️ Cutoff TIGHTENED 30 min for 2026 (was 12:45 AM). Arguably most breathtaking section of the entire race — views both directions. Weather can turn fast at altitude.",
+   food:"Quick snack only. Gels or chews — don't linger.",gear:"Warm layer accessible. Windy and exposed at this elevation."},
+  {name:"Cow Camp (return)",mile:54.8,delta:4.8,bag:false,crew:false,pacer:false,cutoff:"—",clock:"~9:00 PM",type:"remote",
+   logistics:"Leaving Cow Camp heading to Sunlight: ⚠️ NOW cross the creek (feet WILL get wet) — opposite to the Halfmoon approach. Follow trail 122 heading NE. Trail can be wet and swampy. ⚠️ ESSENTIAL LEFT TURN at ~1mi up North Fork on trail 273 — easy to miss especially at night, watch for flagging. Nice singletrack with switchbacks, gradually climbing. Often hot and humid during day but most see this section in the evening/night. Lots of tree cover. Filter spots spread along course. Above treeline: trail becomes harder to see — ⚠️ GPX essential from here. It will be dark.",
+   food:"Broth. Real food if available. Eat now — long night section ahead.",gear:"Confirm headlamp is on and working."},
+  {name:"Sunlight",sub:"★ HIKE-IN 0.7mi from parking",mile:63.3,delta:8.5,bag:true,crew:"†",pacer:"†",cutoff:"5:30 AM Sat",clock:"~12:30 AM",type:"crew",
+   logistics:"⚠️ Crew/pacer must park and hike 0.7mi in to aid station. Most runners arrive predawn/dark. Approach above treeline: boulder fields, cairns past small pond (don't fall in!), CAIRN navigation to Sunlight Lake area, trail turns sharply RIGHT before the lake to ascend the mountain. Loose dirt/rock ascent to saddle. Ridgeline trail (tundra + rocks) — large cairns mark course. Windy: stay slightly right of trail in spots where it's close to the edge. ⚠️ CRUCIAL DESCENT — most technical section of the course. DO NOT RUN. Extremely steep, exposed, loose rock and sand. Sit-scoot the worst section (~10 yards dropping 10-15ft then sidhilling a chute). Poles can be lost down chute — do not retrieve. Yell ROCK if you dislodge anything. Once through: trail widens, dinner-plate rocks, then quad-pounding descent to treeline and pleasantly runnable. Fork: stay left on trail 260, then stay right — marked junction. Cross creek to aid station. Leaving Sunlight: ½mi back up trail, LEFT at junction, RIGHT onto flagged singletrack. Down into Deep Creek crossing (WET — you'll understand why it's called that). Winds through trees, opens to old wide trail/road. Reaches Shields River Loop Rd — left out of parking lot, road down to shortcut through private land (cow trail, hard to see at first). Returns to Shields River Rd — right down toward Crandall.",
+   food:"Night food. Hot soup/ramen if crew has thermos. Caffeine gel. Ginger chews proactively.",gear:"Fresh socks — feet will be wet from crossings. Warm layer check. Headlamp battery good for predawn miles?"},
+  {name:"Crandall",sub:"★ KEY CREW STOP",mile:70.4,delta:7.1,bag:true,crew:true,pacer:true,cutoff:"7:45 AM Sat",clock:"~3:00 AM",type:"crew",
+   logistics:"Via Shields River Loop Rd. Dawn arrival likely. Leaving toward Forest Lake: back out gate, left, left at parking lot along two-track dirt road, drop to creek (usually crossable dry), up left through grassy field to lone tree → fenceline gate (cross the steps). Two-track dirt through horse pasture on private property. Up the draw on 4WD 'road' (grassy, sometimes just a track). Top of long climb → obvious 2-track, veer up-left at big fence pole. Left turn up the mountain — cow trail to salt lick area (~7,500ft), heavily marked. Over the hill, native grass — watch reflective tags. Suddenly: well-cut trail down through trees appears out of nowhere. Down to Eagle Creek — cross it MANY times. Gravel road left to Forest Lake. ⚠️ Cannot crew both Crandall AND Forest Lake (2.5h drive). Choose one.",
+   food:"Dawn food. Real calories. Coffee. Runner has been out ~21 hrs.",gear:"Shoe/sock change? Blister recheck. Sunrise layer swap — day warming up."},
+  {name:"Forest Lake",sub:"★ LAST CREW POINT · 4WD road",mile:78.3,delta:7.9,bag:true,crew:"4WD",pacer:true,cutoff:"10:15 AM Sat",clock:"~5:30 AM",type:"crew",priority:true,
+   logistics:"⚠️ Rough 4WD road to reach. LAST crew before finish — NO crew at Huntin Camp in 2026. Pacers joining here MUST run to finish. Leaving: loop around, stay left toward where you came up, hit main road then GO STRAIGHT off the road onto narrow singletrack dropping toward lake. Left onto narrow ATV road along lake (tree cover, good footing). Left through meadow, back up to road. Right up along trail 635 (hard to see at start). Up through trees to junction 642 → left. Large downfall area with bare trees and cut logs — follow flagging. LEFT turn in inconspicuous spot, heavily marked. Out of treeline into meadow. ¼-mile hand-cut trail (new 2025) to ridgeline. 1.5mi ridge run — meadow left, treeline right. Drop left off ridge onto trail that appears suddenly. Trail disappears often — ⚠️ GPX essential. Out into tall grass meadow, odd sign in tree, flags in grass (hard to see — markers on ground and in trees). Basically straight up mountain on old two-track very hard to see. Veer left into Honey Trail aid.",
+   food:"Sunrise food. Eggs/bacon from crew thermos if possible. Coffee. This is the last crew food.",gear:"Last blister/tape check. Poles for final climbs? Last shoe change opportunity."},
+  {name:"Honey Trail",mile:85.4,delta:7.1,bag:false,crew:false,pacer:false,cutoff:"—",clock:"~8:30 AM",type:"remote",
+   logistics:"No crew. Fully exposed ridge. Often windy. Rocky rolling two-track. Seems like the top but continues a slight steady uphill. Views back to jagged peaks already conquered — dig deep. Stay left on trail 396. ⚠️ CRUCIAL RIGHT TURN at fork — stay on trail 396 (left = trail 9244, wrong direction; cows trample flags here so double-check). ~½mi past fork: treeline, water tank on right. ⚠️ Filter from PIPE into tank — do NOT drink directly from stock tank. Wide 2-track descent through trees, rocky, winds and turns — easy to follow. Eventually along creek. Meadowy two-track, easy downgrade. Gate (hop over or through depending on cows). Large creek crossing — feet WILL get wet. Huntin Camp aid station is right around the corner. Consider sitting in the creek if hot — dry clothes in drop bag right there.",
+   food:"Gels. Real food if any remains. 85 miles in — fuel what you can.",gear:"—"},
+  {name:"Huntin Camp",sub:"⛔ NO CREW 2026 · Drop bag only",mile:92.8,delta:7.4,bag:true,crew:false,pacer:false,cutoff:"4:45 PM Sat",clock:"~11:45 AM",type:"warn",
+   logistics:"⛔ NO CREW ACCESS 2026. Drop bag only. DNF here is final — no retrieval possible. Leaving (NEW 2026 route): up road briefly then down gravel/dirt road. Cattle guards — enjoy the ranchland. Turn right past cattle guard, run along the dam, right at end along north side of reservoir. Ranch two-track around the mountain (heavily marked but two-track not always obvious). More obvious road → gate → north. Wind around to the highway. Cross highway. Up driveway to Berg Ranch. Left through the unassuming archway. You can take the hug — they think you should!",
+   food:"Whatever is in drop bag. 7 miles to go. Eat and go.",gear:"—"},
+  {name:"Finish",sub:"Berg Ranch · Martinsdale MT",mile:100,delta:7.2,bag:false,crew:true,pacer:true,cutoff:"6:00 PM Sat",clock:"~9:00 AM",type:"crew",
+   logistics:"Berg Ranch, 41 Berg Rd, Martinsdale MT. Left through unassuming archway — optional finisher's hug (they think you should take it!). Custom buckle. Camping along creek. Awards + celebration 6:15 PM Sat.",
+   food:"🎉 FOOD & BEER — you earned it.",gear:"Dry clothes. Recovery shoes. Foam roller. Warm layer."},
+];
+
+const LEGS = STATIONS.slice(0,-1).map((s,i)=>({
+  from:s.name, to:STATIONS[i+1].name,
+  fromMile:s.mile, toMile:STATIONS[i+1].mile,
+  dist:typeof STATIONS[i+1].delta==="number"?STATIONS[i+1].delta:0,
+  toType:STATIONS[i+1].type,
+  tags:[
+    // 0: Start → Porcupine (6.1mi)
+    ["🏃 Most runnable terrain on course","💧 Crossings mostly dry","⚠️ Refill at Porcupine — people run out"],
+    // 1: Porcupine → Ibex (13.3mi)
+    ["🏃 Singletrack continues","💧 Many filter spots & crossings","⚠️ Shale section & logged areas","🏃 Ends on forest road to Ibex cabin"],
+    // 2: Ibex → Cow Camp (12.5mi)
+    ["⛰️ 2,700ft climb in 5mi to pass","⚠️ ESSENTIAL right turn trail 123 at lookout","💧 Fill water at Ibex — filter spots at climb base","🐐 Mountain goats at Campfire Lake","💧 Middle Fork crossing WILL wet feet"],
+    // 3: Cow Camp → Halfmoon (11.5mi)
+    ["⛰️ Second major climb to Conical Pass","🗿 Cairn nav in grassy meadows","💧 Wet crossing 1.8mi from CC","⚠️ GPX essential above treeline","🌙 Night miles likely","⛰️ Rocky/shale descent Twin Lakes canyon"],
+    // 4: Halfmoon → Conical Pass (6.6mi — return trip)
+    ["⛰️ Retrace climb to Conical Pass","🌙 Night miles","🌬️ Exposed alpine","⚠️ Cutoff 12:15 AM Sat"],
+    // 5: Conical Pass → Cow Camp return (4.8mi)
+    ["⛰️ Descent back to Cow Camp","🌙 Night section","⚠️ Trail hard to see — follow flagging"],
+    // 6: Cow Camp → Sunlight (8.5mi)
+    ["💧 Creek crossing leaving CC (wet feet)","⚠️ ESSENTIAL left turn at ~1mi onto trail 273","🌙 Night section","⚠️ GPX essential above treeline","🗿 Cairn navigation past Sunlight Lake"],
+    // 7: Sunlight → Crandall (7.1mi)
+    ["⚠️ CRUCIAL — WALK the saddle descent (trail 260)","⚠️ Sit-scoot the chute section","💧 Deep Creek crossing (WET)","🌙 Predawn miles","🏃 Road section to Crandall"],
+    // 8: Crandall → Forest Lake (7.9mi)
+    ["🌙 Dawn arrival likely","💧 Eagle Creek crossings (many)","⛰️ Climb to ~7,500ft cow trail","🏃 Hidden forest trail then gravel road"],
+    // 9: Forest Lake → Honey Trail (7.1mi)
+    ["🏃 Lake singletrack then trail 635","⚠️ GPX essential — trail disappears","🏃 1.5mi hand-cut ridge run","⚠️ Tall grass meadow — markers on ground"],
+    // 10: Honey Trail → Huntin Camp (7.4mi)
+    ["🌬️ Fully exposed ridge","⚠️ CRUCIAL right turn — stay on trail 396","💧 Filter at pipe into water tank (NOT from tank)","💧 Final creek crossing WILL wet feet"],
+    // 11: Huntin Camp → Finish (7.2mi)
+    ["🏃 Straightforward — just tired legs","⚠️ NEW 2026 reservoir route","🏃 Ranch two-track to highway","🏁 Berg Ranch finish"],
+  ][i]||[]
+}));
+
+const DEFAULT_DB = [
+  {id:"gel-v",   name:"Gel – Vanilla",         cat:"Fuel",       cal:100,carbs:25,sodium:55, notes:"Maurten / SIS"},
+  {id:"gel-caf", name:"Gel – Caffeine",         cat:"Fuel",       cal:100,carbs:25,sodium:55, notes:"100mg caffeine"},
+  {id:"chews",   name:"Chews (1 pack)",          cat:"Fuel",       cal:100,carbs:25,sodium:70, notes:"Clif Bloks or similar"},
+  {id:"coffee",  name:"Coffee (cup)",            cat:"Fuel",       cal:5,  carbs:0, sodium:5,  notes:"Crew/aid station"},
+  {id:"potato",  name:"Boiled Potato + Salt",    cat:"Real Food",  cal:80, carbs:18,sodium:300,notes:"Aid station staple"},
+  {id:"pbj",     name:"PB&J (half sandwich)",    cat:"Real Food",  cal:180,carbs:22,sodium:200,notes:"Crew / drop bag"},
+  {id:"ramen",   name:"Ramen / Noodle Soup",     cat:"Real Food",  cal:190,carbs:27,sodium:800,notes:"Crew thermos / aid station"},
+  {id:"rice",    name:"Rice Ball",               cat:"Real Food",  cal:120,carbs:26,sodium:150,notes:""},
+  {id:"broth",   name:"Broth (cup)",             cat:"Real Food",  cal:15, carbs:1, sodium:900,notes:"Aid station"},
+  {id:"coke",    name:"Coca-Cola (can)",          cat:"Real Food",  cal:150,carbs:39,sodium:45, notes:"Night miles – nausea reset"},
+  {id:"banana",  name:"Banana",                  cat:"Real Food",  cal:105,carbs:27,sodium:1,  notes:""},
+  {id:"pizza",   name:"Pizza (slice)",           cat:"Real Food",  cal:285,carbs:36,sodium:640,notes:"Cow Camp specialty!"},
+  {id:"eggs",    name:"Eggs & Bacon (serving)",  cat:"Real Food",  cal:280,carbs:1, sodium:600,notes:"Crew at Forest Lake / dawn"},
+  {id:"cheese",  name:"Grilled Cheese (half)",   cat:"Real Food",  cal:200,carbs:18,sodium:380,notes:"Crew favourite"},
+  {id:"ginger",  name:"Ginger Chew",             cat:"Supplement", cal:10, carbs:2, sodium:0,  notes:"Nausea prevention"},
+  {id:"salt",    name:"Salt Tab / Capsule",      cat:"Electrolyte",cal:0,  carbs:0, sodium:250,notes:"SaltStick or Precision"},
+  {id:"ph",      name:"PH Electrolyte Mix",      cat:"Electrolyte",cal:10, carbs:2, sodium:500,notes:"Per serving"},
+  {id:"w500",    name:"Water (500ml)",            cat:"Hydration",  cal:0,  carbs:0, sodium:0,  notes:""},
+  {id:"w750",    name:"Water (750ml)",            cat:"Hydration",  cal:0,  carbs:0, sodium:0,  notes:""},
+  {id:"tailwind",name:"Tailwind (1 scoop)",       cat:"Hydration",  cal:100,carbs:25,sodium:310,notes:"Per scoop in water"},
+  {id:"ibu",     name:"Ibuprofen (200mg)",        cat:"Medical",    cal:0,  carbs:0, sodium:0,  notes:"Use sparingly"},
+  {id:"antacid", name:"Antacid (Tums)",           cat:"Medical",    cal:0,  carbs:0, sodium:0,  notes:""},
+];
+
+const CATS = ["Fuel","Real Food","Hydration","Electrolyte","Supplement","Medical","Other"];
+const CAT_COLORS = {Fuel:"#F59E0B","Real Food":"#34D399",Hydration:"#60A5FA",Electrolyte:"#2DD4BF",Supplement:"#A78BFA",Medical:"#EF4444",Other:"#94A3B8"};
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+const DEFAULT_GEAR_SECTIONS = [
+  {name:"Mandatory Gear",col:"#EF4444",items:[
+    {i:"Water vessel ≥1.5L",n:"Soft flasks or bladder"},
+    {i:"Water filter",n:"Salomon XA filter — essential, trail has many crossings"},
+    {i:"Emergency bivy / space blanket",n:"Lightweight ok"},
+    {i:"Rain jacket / wind shell",n:"Golfball hail possible in July"},
+    {i:"Warm insulating layer",n:"Fleece or puffy for night/alpine"},
+    {i:"Headlamp + spare batteries",n:"You WILL run through the night"},
+    {i:"Bear spray",n:"Bear, cougar, moose country"},
+    {i:"Phone with GPX downloaded",n:"⚠️ Essential — trail disappears multiple times"},
+  ]},
+  {name:"Running & Comfort",col:"#60A5FA",items:[
+    {i:"Trail shoes (race pair)",n:"Tested and broken in — rocky wet terrain"},
+    {i:"Trail shoes (backup pair)",n:"Drop bag at Halfmoon or Crandall"},
+    {i:"Trekking poles",n:"Highly recommended — 23k ft + scree"},
+    {i:"Gaiters",n:"Scree fields + tall grass meadows"},
+    {i:"Race vest / pack",n:""},
+    {i:"Socks x3 (wool)",n:"Feet WILL get wet. Change at Halfmoon + Crandall."},
+    {i:"Sun hat / cap",n:"July Montana sun"},
+    {i:"Gloves (light)",n:"Night temps + exposed ridges"},
+    {i:"Long sleeve baselayer",n:"Night / dawn miles"},
+  ]},
+  {name:"Medical & Blister",col:"#2DD4BF",items:[
+    {i:"Body Glide / anti-chafe",n:"Head to toe pre-race"},
+    {i:"Blister kit (Leukotape, needle)",n:"Wet feet guaranteed — Leukotape > moleskin"},
+    {i:"Ginger chews x15+",n:"Nausea prevention after hour 12"},
+    {i:"Caffeine gels x3",n:"Hours ~12, ~20–22, ~24"},
+    {i:"Antacids / Pepto tabs",n:""},
+    {i:"Electrolyte tabs",n:""},
+    {i:"Sunscreen",n:"Reapply at Ibex"},
+    {i:"Toilet paper + trowel",n:"LNT — pack out TP"},
+  ]},
+  {name:"Crew Bag Essentials",col:"#F59E0B",items:[
+    {i:"Hot food thermos (ramen, soup)",n:"Halfmoon / Crandall / Forest Lake"},
+    {i:"Extra gels x20",n:"Halfmoon drop bag"},
+    {i:"Backup headlamp + batteries",n:"Halfmoon drop bag"},
+    {i:"Warm jacket (heavier)",n:"Overnight miles"},
+    {i:"Dry socks x2",n:"Halfmoon + Crandall"},
+    {i:"Coca-Cola (cold cans)",n:"Night/dawn miles"},
+    {i:"Warm breakfast food",n:"Forest Lake ~5:30 AM arrival"},
+    {i:"Chair + warm blanket",n:"Brief sit-downs"},
+    {i:"Phone charger / battery bank",n:"GPX drains battery fast"},
+    {i:"Pacer bibs",n:"Must sign waiver online pre-race"},
+  ]},
+];
+
+let STATE = {
+  gistId: "",      // GitHub Gist ID
+  gistToken: "",   // GitHub personal access token (gist scope)
+  nutDB: JSON.parse(JSON.stringify(DEFAULT_DB)),
+  plan: {},
+  strategy: {
+    calPerHr: 250,
+    carbsPerHr: 60,
+    sodiumPerHr: 500,
+    waterPerHr: 600,
+    raceHours: 27,
+  },
+  pace: {
+    goalHours: 27,
+    startTime: "06:00",
+    overrides: {},
+    actuals: {},   // {stationIndex: "HH:MM"} — actual arrival times logged by crew
+  },
+  gearSections: JSON.parse(JSON.stringify(DEFAULT_GEAR_SECTIONS)),
+  gearChecked: {},
+  openSections: {},
+  // Editable content — admin tab
+  legNotes: {},        // {legIndex: {tags:[], courseNote:""}}
+  stationNotes: {},    // {stationIndex: {logistics:"", food:"", gear:""}}
+  crewInfo: {
+    driving: [
+      {leg:"Start → Ibex",          time:"~1.5 hrs",    note:"Road accessible.",                                       warn:false},
+      {leg:"Ibex → Halfmoon",       time:"~1.5 hrs",    note:"Rough forest service roads.",                            warn:false},
+      {leg:"Halfmoon → Sunlight",   time:"~45 min",     note:"HIKE-IN 0.7mi. Arrive early — pacer swap point.",       warn:true},
+      {leg:"Sunlight → Crandall",   time:"~45–60 min",  note:"⚠️ Cannot crew both easily. Choose one.",               warn:true},
+      {leg:"Crandall → Forest Lake",time:"~2.5 hrs",    note:"⚠️ Rough 4WD road. Cannot crew both. Choose one.",      warn:true},
+      {leg:"Forest Lake → Finish",  time:"Drive ahead", note:"⛔ NO crew at Huntin Camp. Next = FINISH.",              warn:true},
+    ],
+    decisions: [
+      {title:"Sunlight vs Crandall",     body:"Cannot easily crew both. Crandall = easier access. Sunlight = hike-in but good pacer swap point."},
+      {title:"Crandall vs Forest Lake",  body:"~2.5h drive apart on rough roads. Forest Lake (mi 78.3) is last crew before finish."},
+      {title:"Pacer rules",              body:"Pacers join at Halfmoon (mi 43.4) or later. Starting at Forest Lake or before = must run to finish. No muling. Sign waiver online pre-race."},
+    ],
+    raceInfo: [
+      {label:"Race date",     value:"Fri Jul 24, 2026 · 6:00 AM"},
+      {label:"Finish cutoff", value:"Sat Jul 25, 2026 · 6:00 PM"},
+      {label:"Start",         value:"Westling Ranch, Wilsall MT (use map — no address)"},
+      {label:"Finish",        value:"41 Berg Rd, Martinsdale MT"},
+      {label:"RD email",      value:"megandehaan@crazymountainultra.com"},
+      {label:"Drop bags due", value:"Thu Jul 24 · 3–7 PM at Berg Ranch"},
+    ],
+  },
+};
+
+let syncTimer = null;
+let lastSyncedJSON = "";
+let activeLegIdx = null;
+let activeTab = "fuel";
+let dbFilterCat = "All";
+let editingItemId = null;
+let useMetric = false;  // false = mi/ft, true = km/m
+
+// ═══════════════════════════════════════════════════════════
+// UNIT CONVERSION
+// ═══════════════════════════════════════════════════════════
+const MI_TO_KM  = 1.60934;
+const FT_TO_M   = 0.3048;
+
+function toggleUnits(){
+  useMetric = !useMetric;
+  try{ localStorage.setItem("cm100_metric", useMetric ? "1" : "0"); }catch(e){}
+  const btn = document.getElementById("unit-toggle");
+  if(btn) btn.textContent = useMetric ? "km/m" : "mi/ft";
+  if(typeof renderTab === "function") renderTab(activeTab);
+}
+
+// Distance: miles in, returns formatted string
+function fmtDist(miles){
+  if(miles === "—" || miles === 0 && typeof miles === "string") return "—";
+  const n = Number(miles);
+  if(isNaN(n)) return miles;
+  if(useMetric){
+    const km = n * MI_TO_KM;
+    return km < 1 ? `${Math.round(km*1000)}m` : `${km.toFixed(1)}km`;
+  }
+  return `${n}mi`;
+}
+
+// Vert: feet in, returns formatted string
+function fmtVert(feet){
+  if(useMetric){ return `${Math.round(feet * FT_TO_M).toLocaleString()}m`; }
+  return `${feet.toLocaleString()}ft`;
+}
+
+// Pace: min/mile → formatted pace string
+function fmtPace(minPerMile){
+  if(useMetric){
+    const minPerKm = minPerMile / MI_TO_KM;
+    const m = Math.floor(minPerKm);
+    const s = Math.round((minPerKm - m) * 60);
+    return `${m}:${String(s).padStart(2,"0")}/km`;
+  }
+  const m = Math.floor(minPerMile);
+  const s = Math.round((minPerMile - m) * 60);
+  return `${m}:${String(s).padStart(2,"0")}/mi`;
+}
+
+// Station mile label (used in UI)
+function fmtMile(mile){
+  if(useMetric) return (mile * MI_TO_KM).toFixed(1);
+  return mile;
+}
+function unitLabel(){ return useMetric ? "km" : "mi"; }
+
+// ═══════════════════════════════════════════════════════════
+// SYNC / GITHUB GIST
+// ═══════════════════════════════════════════════════════════
+const GIST_FILENAME = "cm100_plan.json";
+
+function syncReady(){ return STATE.gistId && STATE.gistToken; }
+
+function gistHeaders(){
+  return {
+    "Accept": "application/vnd.github+json",
+    "Authorization": `Bearer ${STATE.gistToken}`,
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+}
+
+async function loadFromGist(){
+  if(!syncReady()) return;
+  setSyncStatus("spin","Syncing…");
+  try{
+    const r = await fetch(`https://api.github.com/gists/${STATE.gistId}`, {headers: gistHeaders()});
+    if(!r.ok) throw new Error(r.status);
+    const gist = await r.json();
+    const raw = gist.files?.[GIST_FILENAME]?.content;
+    if(!raw) throw new Error("File not found in gist");
+    const incoming = raw;
+    if(incoming !== lastSyncedJSON){
+      const data = JSON.parse(raw);
+      if(data.nutDB)       STATE.nutDB        = data.nutDB;
+      if(data.plan)        STATE.plan         = data.plan;
+      if(data.strategy)    STATE.strategy     = {...STATE.strategy,...data.strategy};
+      if(data.pace)        STATE.pace         = {...STATE.pace,...data.pace};
+      if(data.gearSections)STATE.gearSections = data.gearSections;
+      if(data.legNotes)    STATE.legNotes     = data.legNotes;
+      if(data.stationNotes)STATE.stationNotes = data.stationNotes;
+      if(data.crewInfo)    STATE.crewInfo     = {...STATE.crewInfo,...data.crewInfo};
+      lastSyncedJSON = incoming;
+      saveLocal();
+      renderTab(activeTab);
+    }
+    setSyncStatus("ok","Synced");
+  } catch(e){
+    setSyncStatus("err","Sync error — " + e.message);
+  }
+}
+
+async function pushToGist(){
+  if(!syncReady()) return;
+  setSyncStatus("spin","Saving…");
+  try{
+    const payload = {nutDB:STATE.nutDB, plan:STATE.plan, strategy:STATE.strategy, pace:STATE.pace, gearSections:STATE.gearSections, legNotes:STATE.legNotes, stationNotes:STATE.stationNotes, crewInfo:STATE.crewInfo};
+    const body = JSON.stringify(payload, null, 2);
+    if(body === lastSyncedJSON){ setSyncStatus("ok","Synced"); return; }
+    const r = await fetch(`https://api.github.com/gists/${STATE.gistId}`, {
+      method: "PATCH",
+      headers: {...gistHeaders(), "Content-Type": "application/json"},
+      body: JSON.stringify({files:{[GIST_FILENAME]:{content:body}}}),
+    });
+    if(!r.ok) throw new Error(r.status);
+    lastSyncedJSON = body;
+    setSyncStatus("ok","Synced ✓");
+  } catch(e){
+    setSyncStatus("err","Save failed — " + e.message);
+  }
+}
+
+function schedulePush(){
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(pushToGist, 1500);
+}
+
+function setSyncStatus(state, msg){
+  const dot = document.getElementById("sync-dot");
+  const txt = document.getElementById("sync-status");
+  dot.className = ""; dot.classList.add(state);
+  txt.textContent = msg;
+}
+
+// Poll every 20s when tab is visible (Gist API rate limit: 5000 req/hr authed)
+function startPolling(){
+  setInterval(()=>{
+    if(!document.hidden && syncReady()) loadFromGist();
+  }, 20000);
+}
+
+// ═══════════════════════════════════════════════════════════
+// LOCAL STORAGE
+// ═══════════════════════════════════════════════════════════
+function saveLocal(){
+  try{ localStorage.setItem("cm100_state", JSON.stringify(STATE)); } catch(e){}
+}
+function loadLocal(){
+  try{
+    const s = localStorage.getItem("cm100_state");
+    if(s){
+      const parsed = JSON.parse(s);
+      STATE = {...STATE,...parsed};
+    }
+  } catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════
+function legKey(i){ return `leg-${i}`; }
+function legItems(i){ return STATE.plan[legKey(i)] || []; }
+function legTotals(i){
+  return legItems(i).reduce((a,{itemId,qty})=>{
+    const it = STATE.nutDB.find(x=>x.id===itemId);
+    if(!it) return a;
+    return {cal:a.cal+it.cal*qty, carbs:a.carbs+it.carbs*qty, sodium:a.sodium+it.sodium*qty};
+  },{cal:0,carbs:0,sodium:0});
+}
+function dbItem(id){ return STATE.nutDB.find(x=>x.id===id); }
+function uid(){ return "c"+ Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
+
+function badge(text, color){
+  return `<span class="badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${text}</span>`;
+}
+function btn(text, cls="", onclick="", disabled=false){
+  return `<button class="btn ${cls}" onclick="${onclick}" ${disabled?"disabled":""}>${text}</button>`;
+}
+
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.style.display="block";
+  setTimeout(()=>t.style.display="none", 2000);
+}
+
+function mutate(fn){
+  fn();
+  saveLocal();
+  schedulePush();
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════════════════════
+function openModal(html){
+  document.getElementById("modal").innerHTML = html;
+  document.getElementById("modal-overlay").classList.add("open");
+}
+function closeModal(){
+  document.getElementById("modal-overlay").classList.remove("open");
+  editingItemId = null;
+}
+
+// ═══════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════
+function showTab(tab){
+  activeTab = tab;
+  document.querySelectorAll(".tab").forEach(t=>{
+    t.classList.toggle("active", t.dataset.tab===tab);
+  });
+  renderTab(tab);
+}
+function renderTab(tab){
+  const c = document.getElementById("content");
+  if(tab==="fuel")     c.innerHTML = renderFuel();
+  else if(tab==="admin") c.innerHTML = renderAdmin();
+  else if(tab==="pace") c.innerHTML = renderPace();
+  else if(tab==="db")  c.innerHTML = renderDB();
+  else if(tab==="strategy") c.innerHTML = renderStrategy();
+  else if(tab==="aid") c.innerHTML = renderAid();
+  else if(tab==="gear") c.innerHTML = renderGear();
+  else if(tab==="crew") c.innerHTML = renderCrew();
+  else if(tab==="settings") c.innerHTML = renderSettings();
+}
+
+// ═══════════════════════════════════════════════════════════
+// FUEL PLAN
+// ═══════════════════════════════════════════════════════════
+function renderFuel(){
+  const totalCal = LEGS.reduce((s,_,i)=>s+legTotals(i).cal, 0);
+  const totalCarbs = LEGS.reduce((s,_,i)=>s+legTotals(i).carbs, 0);
+  const totalNa = LEGS.reduce((s,_,i)=>s+legTotals(i).sodium, 0);
+
+  let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div>
+      <div style="font-size:12px;font-weight:700">Race Fuel Plan</div>
+      <div style="font-size:10px;color:var(--muted)">Tap a leg to plan</div>
+    </div>
+  </div>`;
+
+  if(!syncReady()){
+    html += `<div class="warn-banner">⚙️ Sync not configured — tap the ⚙️ Sync tab to connect via GitHub Gist. Plan saves locally until then.</div>`;
+  }
+
+  LEGS.forEach((leg,i)=>{
+    const tots = legTotals(i);
+    const items = legItems(i);
+    const typeClass = leg.toType==="warn"?"warn":leg.toType==="crew"?"crew":"remote";
+    const toColor = leg.toType==="warn"?"var(--red)":leg.toType==="crew"?"var(--blue)":"var(--amber)";
+
+    const legTagOverride = (STATE.legNotes[i]||{}).tags;
+    const activeTags = legTagOverride||leg.tags;
+    const tagHtml = activeTags.slice(0,4).map(t=>{
+      let col="var(--muted)";
+      if(t.includes("⛰️"))col="var(--amber)";
+      else if(t.includes("💧"))col="var(--blue)";
+      else if(t.includes("🌙"))col="var(--purple)";
+      else if(t.includes("⚠️"))col="var(--red)";
+      else if(t.includes("🏃"))col="var(--green)";
+      else if(t.includes("🌬️"))col="var(--teal)";
+      else if(t.includes("🗿"))col="var(--muted)";
+      return `<span class="tag" style="color:${col};background:${col}18;border-color:${col}33">${t}</span>`;
+    }).join("");
+
+    const itemBadges = items.length>0
+      ? items.slice(0,3).map(({itemId,qty})=>{
+          const it=dbItem(itemId); if(!it) return "";
+          const col=CAT_COLORS[it.cat]||"var(--muted)";
+          return badge(`${qty}× ${it.name.split(" ").slice(0,2).join(" ")}`, col);
+        }).join(" ") + (items.length>3 ? badge(`+${items.length-3} more`,"var(--muted)"):"")
+      : `<span style="font-size:10px;color:var(--muted);font-style:italic">Tap to plan fuel →</span>`;
+
+    html += `<div class="leg-card card ${typeClass}" onclick="openLeg(${i})">
+      <div class="leg-miles">
+        <div class="from">${fmtMile(leg.fromMile)}</div>
+        <div class="arr">↓</div>
+        <div class="to" style="color:${toColor}">${fmtMile(leg.toMile)}</div>
+        <div class="dist">${fmtDist(leg.dist)}</div>
+      </div>
+      <div class="leg-content">
+        <div class="leg-name">${leg.from} → ${leg.to}</div>
+        <div class="leg-tags">${tagHtml}</div>
+        <div class="leg-items">${itemBadges}</div>
+      </div>
+      <div class="leg-cal">
+        ${tots.cal>0?`<div class="cal">${tots.cal}</div><div class="lbl">cal</div>`:""}
+        <div style="color:var(--muted);font-size:14px;margin-top:4px">›</div>
+      </div>
+    </div>`;
+  });
+
+  if(totalCal>0){
+    html += `<div class="card" style="padding:12px 14px;margin-top:8px;border-color:#F59E0B33">
+      <div style="font-size:11px;font-weight:800;color:var(--amber);margin-bottom:8px">RACE TOTALS</div>
+      ${[["Total Calories",totalCal.toLocaleString()+" cal","var(--amber)"],
+         ["Total Carbs",totalCarbs+"g","var(--green)"],
+         ["Total Sodium",totalNa.toLocaleString()+"mg","var(--teal)"],
+         ["Avg cal/hr (${STATE.strategy.raceHours}h)",Math.round(totalCal/STATE.strategy.raceHours)+" cal/hr","var(--muted)"]
+        ].map(([l,v,col])=>`<div class="row"><span class="lbl">${l}</span><span class="val" style="color:${col}">${v}</span></div>`).join("")}
+    </div>`;
+  }
+  return html;
+}
+
+function openLeg(i){
+  activeLegIdx = i;
+  renderLegModal(i);
+}
+
+function renderLegModal(i){
+  const leg = LEGS[i];
+  const items = legItems(i);
+  const tots = legTotals(i);
+  const toStn = STATIONS.find(s=>s.name===leg.to);
+
+  const totBar = tots.cal>0 ? `<div class="totals">
+    ${[["cal",tots.cal,"var(--amber)"],["carbs",tots.carbs+"g","var(--green)"],["sodium",tots.sodium+"mg","var(--teal)"]].map(([l,v,col])=>`
+    <div class="total-box" style="background:${col}18;border-color:${col}33">
+      <div class="val" style="color:${col}">${v}</div><div class="lbl">${l}</div>
+    </div>`).join("")}
+  </div>` : "";
+
+  const itemRows = items.map(({itemId,qty})=>{
+    const it=dbItem(itemId); if(!it) return "";
+    const col=CAT_COLORS[it.cat]||"var(--muted)";
+    return `<div class="item-card" style="border-color:${col}33">
+      <div class="item-info">
+        <div class="item-name">${it.name}</div>
+        <div class="item-meta">${it.cal*qty} cal · ${it.carbs*qty}g carbs · ${it.sodium*qty}mg Na</div>
+      </div>
+      <div class="stepper">
+        <button class="step-btn" onclick="changeLegQty(${i},'${itemId}',${qty-1})">−</button>
+        <div class="step-val">${qty}</div>
+        <button class="step-btn" style="border-color:${col}66;background:${col}22;color:${col}" onclick="changeLegQty(${i},'${itemId}',${qty+1})">+</button>
+      </div>
+      <button onclick="changeLegQty(${i},'${itemId}',0)" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:0 2px">✕</button>
+    </div>`;
+  }).join("");
+
+  const tagHtml = leg.tags.map(t=>{
+    let col="var(--muted)";
+    if(t.includes("⛰️"))col="var(--amber)";
+    else if(t.includes("💧"))col="var(--blue)";
+    else if(t.includes("🌙"))col="var(--purple)";
+    else if(t.includes("⚠️"))col="var(--red)";
+    else if(t.includes("🏃"))col="var(--green)";
+    else if(t.includes("🌬️"))col="var(--teal)";
+    return `<span class="tag" style="color:${col};background:${col}18;border-color:${col}33">${t}</span>`;
+  }).join("");
+
+  openModal(`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <button class="btn sm muted" onclick="closeModal()">← Back</button>
+      <div>
+        <div style="font-weight:800;font-size:13px">${leg.from} → ${leg.to}</div>
+        <div style="font-size:10px;color:var(--muted)">${fmtDist(leg.dist)}</div>
+      </div>
+    </div>
+    <div class="terrain-box">
+      <div class="lbl">TERRAIN & COURSE NOTES</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${tagHtml}</div>
+      <div style="font-size:10px;color:var(--dim);line-height:1.6">${toStn?toStn.logistics:""}</div>
+    </div>
+    ${totBar}
+    ${itemRows||`<div style="text-align:center;padding:20px 0;color:var(--muted);font-size:12px">No fuel added yet</div>`}
+    <button class="btn" style="width:100%;margin-top:8px" onclick="openLegPicker(${i})">+ Add Food / Drink</button>
+  `);
+}
+
+function changeLegQty(legIdx, itemId, qty){
+  mutate(()=>{
+    const key=legKey(legIdx), ex=STATE.plan[key]||[];
+    STATE.plan[key] = qty<=0
+      ? ex.filter(x=>x.itemId!==itemId)
+      : ex.find(x=>x.itemId===itemId)
+        ? ex.map(x=>x.itemId===itemId?{...x,qty}:x)
+        : [...ex,{itemId,qty}];
+  });
+  renderLegModal(legIdx);
+  renderTab("fuel");
+}
+
+function openLegPicker(legIdx){
+  const cats=["All",...CATS];
+  const catBtns = cats.map(cat=>{
+    const col=CAT_COLORS[cat]||"var(--teal)";
+    const active = dbFilterCat===cat;
+    return `<button class="btn sm" style="background:${active?col+"33":"#fff1"};border-color:${active?col:"#fff3"};color:${active?col:"var(--muted)"}" onclick="setDBFilter('${cat}',${legIdx})">${cat}</button>`;
+  }).join("");
+
+  const items = STATE.nutDB.filter(it=>dbFilterCat==="All"||it.cat===dbFilterCat);
+  const rows = items.map(it=>{
+    const col=CAT_COLORS[it.cat]||"var(--muted)";
+    const alreadyQty=(STATE.plan[legKey(legIdx)]||[]).find(x=>x.itemId===it.id)?.qty||0;
+    return `<div class="item-card" style="border-color:${col}33">
+      <div class="item-info">
+        <div class="item-name">${it.name}</div>
+        <div class="item-meta">${it.cal} cal · ${it.carbs}g carbs · ${it.sodium}mg Na</div>
+        ${it.notes?`<div class="item-note">${it.notes}</div>`:""}
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+        ${alreadyQty>0?badge(alreadyQty+"×",col):""}
+        <button onclick="addToLeg(${legIdx},'${it.id}')" style="width:28px;height:28px;border-radius:6px;border:1px solid ${col}66;background:${col}22;color:${col};font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700">+</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  openModal(`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <button class="btn sm muted" onclick="renderLegModal(${legIdx})">← Back</button>
+      <div style="font-size:12px;font-weight:700">Add to leg ${legIdx+1}</div>
+    </div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">${catBtns}</div>
+    ${rows}
+    <button class="btn sm" style="margin-top:8px;width:100%" onclick="openAddItemModal(${legIdx})">＋ Add new food to database</button>
+  `);
+}
+
+function setDBFilter(cat, legIdx){
+  dbFilterCat=cat;
+  if(legIdx!==undefined) openLegPicker(legIdx);
+  else showTab("db");
+}
+
+function addToLeg(legIdx, itemId){
+  mutate(()=>{
+    const key=legKey(legIdx), ex=STATE.plan[key]||[];
+    const fi=ex.findIndex(x=>x.itemId===itemId);
+    STATE.plan[key] = fi>=0 ? ex.map((x,i)=>i===fi?{...x,qty:x.qty+1}:x) : [...ex,{itemId,qty:1}];
+  });
+  openLegPicker(legIdx);
+  renderTab("fuel");
+}
+
+// ═══════════════════════════════════════════════════════════
+// PACE ENGINE
+// ═══════════════════════════════════════════════════════════
+
+// Cutoff times as minutes-from-start (race starts 6:00 AM Fri)
+const CUTOFFS = {
+  2:  7*60,        // Ibex 1:00 PM = 7h from 6AM
+  4:  15*60+45,    // Halfmoon 9:45 PM = 15h45m
+  5:  18*60+15,    // Conical Pass 12:15 AM Sat = 18h15m
+  7:  23*60+30,    // Sunlight 5:30 AM Sat = 23h30m
+  8:  21*60+45,    // Crandall 7:45 AM Sat = 21h45m — wait, 7:45AM SAT = 25h45m
+  9:  28*60+15,    // Forest Lake 10:15 AM Sat = 28h15m
+  11: 34*60+45,    // Huntin Camp 4:45 PM Sat = 34h45m
+  12: 36*60,       // Finish 6:00 PM Sat = 36h
+};
+// Corrected: minutes since 6:00 AM Friday
+const CUTOFF_MIN = {
+  2:  7*60,        // Ibex: 1:00 PM Fri
+  4:  15*60+45,    // Halfmoon: 9:45 PM Fri
+  5:  18*60+15,    // Conical Pass: 12:15 AM Sat
+  7:  23*60+30,    // Sunlight: 5:30 AM Sat
+  8:  25*60+45,    // Crandall: 7:45 AM Sat
+  9:  28*60+15,    // Forest Lake: 10:15 AM Sat
+  11: 34*60+45,    // Huntin Camp: 4:45 PM Sat
+  12: 36*60,       // Finish: 6:00 PM Sat
+};
+
+function parseStartTime(hhmm){
+  const [h,m] = hhmm.split(":").map(Number);
+  return h*60 + m;
+}
+
+// Convert a clock-time override string "HH:MM" to minutes-from-start,
+// using the previous station's elapsed time to resolve the correct day.
+function clockToElapsed(hhmm, startMin, prevElapsed){
+  const [oh, om] = hhmm.split(":").map(Number);
+  const clockMin = oh*60 + om;
+  // How many minutes into the race does startMin + elapsed land?
+  // We try 0, 24h, 48h offsets and pick the one closest to prevElapsed
+  // but always greater-or-equal (you can't arrive before the prior station)
+  const candidates = [0, 24*60, 48*60].map(offset => {
+    const abs = clockMin - startMin + offset;
+    return abs;
+  });
+  // Pick smallest candidate that is >= prevElapsed
+  const valid = candidates.filter(c => c >= prevElapsed);
+  return valid.length > 0 ? valid[0] : candidates[candidates.length-1];
+}
+
+// Build ETAs with cascading: an override on station i re-anchors all subsequent
+// auto stations proportionally for the remaining distance/time.
+function computeETAs(){
+  const goalMinutes = STATE.pace.goalHours * 60;
+  const startMin    = parseStartTime(STATE.pace.startTime || "06:00");
+  const overrides   = STATE.pace.overrides || {};
+
+  const results = [];
+  let prevElapsed = 0;
+
+  for(let i = 0; i < STATIONS.length; i++){
+    const s = STATIONS[i];
+    let minFromStart;
+
+    if(i === 0){
+      minFromStart = 0;
+    } else if(overrides[i] !== undefined){
+      // Manual override — resolve day using previous station as anchor
+      minFromStart = clockToElapsed(overrides[i], startMin, prevElapsed);
+    } else {
+      // Auto: find the next override after this station (or finish)
+      // and the last anchor (override or start) before this station
+      let anchorIdx = 0, anchorElapsed = 0;
+      for(let j = i-1; j >= 0; j--){
+        if(j === 0 || overrides[j] !== undefined){
+          anchorIdx = j;
+          anchorElapsed = results[j] ? results[j].minFromStart : 0;
+          break;
+        }
+      }
+      let nextAnchorIdx = STATIONS.length - 1;
+      let nextAnchorElapsed = goalMinutes;
+      for(let j = i+1; j < STATIONS.length; j++){
+        if(j === STATIONS.length-1 || overrides[j] !== undefined){
+          nextAnchorIdx = j;
+          nextAnchorElapsed = overrides[j]
+            ? clockToElapsed(overrides[j], startMin, anchorElapsed)
+            : goalMinutes;
+          break;
+        }
+      }
+      // Interpolate by mileage between anchors
+      const anchorMile = STATIONS[anchorIdx].mile;
+      const nextMile   = STATIONS[nextAnchorIdx].mile;
+      const frac = nextMile > anchorMile
+        ? (s.mile - anchorMile) / (nextMile - anchorMile)
+        : 0;
+      minFromStart = Math.round(anchorElapsed + frac * (nextAnchorElapsed - anchorElapsed));
+    }
+
+    prevElapsed = minFromStart;
+
+    // Clock time
+    const absoluteMin = startMin + minFromStart;
+    const clockMin = absoluteMin % (24*60);
+    const h = Math.floor(clockMin/60), m = clockMin%60;
+    const hhmm = `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+    const day = absoluteMin >= 24*60 ? "Sat" : "Fri";
+
+    // Cutoff
+    const cutoffMin = CUTOFF_MIN[i];
+    const behindCutoff = cutoffMin != null && minFromStart > cutoffMin;
+    const cutoffBuffer = cutoffMin != null ? cutoffMin - minFromStart : null;
+
+    // Vs goal time: delta from what pure proportional would give
+    const autoElapsed = i === 0 ? 0 : Math.round((s.mile / 100) * goalMinutes);
+    const vsGoal = minFromStart - autoElapsed; // positive = slower than goal pace
+
+    results.push({station:s, idx:i, minFromStart, hhmm, day, behindCutoff, cutoffBuffer, vsGoal, hasOverride: overrides[i]!==undefined});
+  }
+  return results;
+}
+
+function fmtElapsed(min){
+  const h = Math.floor(min/60), m = min%60;
+  return `${h}h${m>0?` ${m}m`:""}`;
+}
+
+function fmtBuffer(min){
+  if(min === null) return "";
+  const abs = Math.abs(min);
+  const h = Math.floor(abs/60), m = abs%60;
+  const t = h>0 ? `${h}h ${m}m` : `${m}m`;
+  return min >= 0 ? `+${t} buffer` : `⚠️ ${t} behind cutoff`;
+}
+
+function fmtLegTime(mins){
+  // Format a leg duration e.g. "2h 15m" or "45m"
+  if(!mins && mins !== 0) return "—";
+  const h = Math.floor(mins/60), m = mins%60;
+  if(h === 0) return `${m}m`;
+  if(m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+// Convert actual "HH:MM" clock entry to elapsed-from-start, anchored by prev station
+function actualToElapsed(hhmm, startMin, prevElapsed){
+  const [oh, om] = hhmm.split(":").map(Number);
+  const clockMin = oh*60 + om;
+  const candidates = [0, 24*60, 48*60].map(offset => clockMin - startMin + offset);
+  const valid = candidates.filter(c => c >= prevElapsed);
+  return valid.length > 0 ? valid[0] : candidates[candidates.length-1];
+}
+
+function renderPace(){
+  const p = STATE.pace;
+  const etas = computeETAs();
+  const actuals = p.actuals || {};
+  const goalH = Math.floor(p.goalHours);
+  const goalM = Math.round((p.goalHours - goalH) * 60);
+  const startMin = parseStartTime(p.startTime || "06:00");
+
+  // Work out actual elapsed times
+  const actualElapsed = {}; // stationIdx -> minutes from start
+  let prevActualElapsed = 0;
+  STATIONS.forEach((s, i) => {
+    if(actuals[i]){
+      const el = actualToElapsed(actuals[i], startMin, prevActualElapsed);
+      actualElapsed[i] = el;
+      prevActualElapsed = el;
+    }
+  });
+
+  // Last station with actual logged = "runner is here now"
+  const lastActualIdx = Math.max(-1, ...Object.keys(actualElapsed).map(Number));
+  const finishEta = etas[etas.length-1];
+
+  const crewStations = etas.filter(e => e.station.crew || e.station.crew === "†" || e.station.crew === "4WD");
+
+  let html = `
+  <!-- Goal time setter -->
+  <div class="card" style="padding:14px;margin-bottom:12px;border-color:var(--teal)44">
+    <div style="font-size:11px;font-weight:800;color:var(--teal);margin-bottom:10px;letter-spacing:1px">GOAL TIME</div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+      <div style="flex:1">
+        <label>Goal finish time</label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="number" id="goal-h" value="${goalH}" min="18" max="36" style="width:64px;text-align:center;font-size:16px;font-weight:800;color:var(--teal)" oninput="updateGoalTime()">
+          <span style="color:var(--muted);font-size:13px">h</span>
+          <input type="number" id="goal-m" value="${goalM}" min="0" max="59" step="5" style="width:64px;text-align:center;font-size:16px;font-weight:800;color:var(--teal)" oninput="updateGoalTime()">
+          <span style="color:var(--muted);font-size:13px">m</span>
+        </div>
+      </div>
+      <div style="flex:1">
+        <label>Race start</label>
+        <input type="time" id="start-time" value="${p.startTime||"06:00"}" oninput="updateStartTime(this.value)" style="font-size:14px;font-weight:700;color:var(--text)">
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted)">
+      Projected finish: <strong style="color:${finishEta.vsGoal > 30?"var(--amber)":finishEta.vsGoal<-30?"var(--green)":"var(--teal)"}">${finishEta.day} ${finishEta.hhmm}</strong>
+      &nbsp;·&nbsp; ${fmtElapsed(finishEta.minFromStart)} total
+      &nbsp;·&nbsp; Avg: <strong style="color:var(--amber)">${fmtPace(p.goalHours*60/100)}</strong>
+    </div>
+  </div>
+
+  <!-- Crew quick-ref -->
+  <div style="font-size:11px;font-weight:800;color:var(--green);letter-spacing:1px;margin-bottom:6px">🚗 CREW ACCESS — expected times</div>
+  <div class="card" style="margin-bottom:14px;border-color:var(--green)33">
+    ${crewStations.map(e=>{
+      const s = e.station;
+      const typeColor = s.priority ? "var(--teal)" : "var(--green)";
+      const actual = actuals[e.idx];
+      const hasActual = actual !== undefined;
+      // Leg time from previous crew station
+      const prevCrew = crewStations.find((c,ci) => crewStations[ci+1]===e);
+      let legMins = null;
+      if(prevCrew){
+        legMins = e.minFromStart - prevCrew.minFromStart;
+      }
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #fff1">
+        <div style="min-width:36px;text-align:center">
+          <div style="font-size:13px;font-weight:800;color:${typeColor}">${fmtMile(s.mile)}</div>
+          <div style="font-size:8px;color:var(--muted)">${unitLabel()}</div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:700">${s.name}</div>
+          <div style="font-size:10px;color:var(--muted)">
+            ${legMins!==null?`Leg: ${fmtLegTime(legMins)} · `:""}${s.cutoff!=="—"?`Cutoff: ${s.cutoff}`:"No cutoff"}
+          </div>
+          ${hasActual?`<div style="font-size:10px;color:var(--green);font-weight:700">✓ Arrived ${actual}</div>`:""}
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:14px;font-weight:800;color:${hasActual?"var(--muted)":"var(--text)"};text-decoration:${hasActual?"line-through":"none"}">${e.day} ${e.hhmm}</div>
+          ${e.cutoffBuffer!==null?`<div style="font-size:9px;color:${e.behindCutoff?"var(--red)":"var(--green)"}">${fmtBuffer(e.cutoffBuffer)}</div>`:""}
+        </div>
+      </div>`;
+    }).join("")}
+  </div>
+
+  <!-- All stations with leg times and actuals -->
+  <div style="font-size:11px;font-weight:800;color:var(--teal);letter-spacing:1px;margin-bottom:4px">ALL STATIONS</div>
+  <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Tap ETA to edit planned time · Tap <strong style="color:var(--green)">LOG</strong> to record actual arrival</div>`;
+
+  etas.forEach((e,i) => {
+    const s = e.station;
+    const hasOverride = e.hasOverride;
+    const actual = actuals[i];
+    const hasActual = actual !== undefined;
+    const isLast = hasActual && i === lastActualIdx;
+
+    // Leg time connector above this station (from previous station)
+    if(i > 0){
+      const prevEta = etas[i-1];
+      const plannedLegMins = e.minFromStart - prevEta.minFromStart;
+      // Actual leg time if both stations have actuals
+      const prevActual = actualElapsed[i-1];
+      const thisActual = actualElapsed[i];
+      const actualLegMins = (prevActual !== undefined && thisActual !== undefined)
+        ? thisActual - prevActual : null;
+
+      const legDiff = actualLegMins !== null ? actualLegMins - plannedLegMins : null;
+      const legColor = legDiff === null ? "var(--muted)" : legDiff > 15 ? "var(--amber)" : legDiff < -15 ? "var(--green)" : "var(--teal)";
+
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:2px 12px;margin-bottom:2px">
+        <div style="min-width:36px;text-align:center">
+          <div style="color:var(--muted);font-size:11px;line-height:1">│</div>
+        </div>
+        <div style="flex:1;font-size:10px;color:${legColor}">
+          ${LEGS[i-1].dist?`${fmtDist(LEGS[i-1].dist)} · `:""}Planned: ${fmtLegTime(plannedLegMins)}${actualLegMins!==null?` · Actual: ${fmtLegTime(actualLegMins)}`:""}
+          ${legDiff!==null && Math.abs(legDiff)>=5?`<span style="font-weight:700"> (${legDiff>0?"+":""}${fmtLegTime(Math.abs(legDiff))} ${legDiff>0?"slow":"fast"})</span>`:""}
+        </div>
+      </div>`;
+    }
+
+    const typeColor = s.type==="warn" ? "var(--red)" : s.priority ? "var(--teal)" : s.type==="crew" ? "var(--blue)" : "var(--amber)";
+    const bgColor = s.type==="warn" ? "var(--warn)" : s.type==="crew" ? "var(--crew)" : "var(--remote)";
+
+    // vs-goal highlight
+    const THRESHOLD_WARN = 15;
+    const THRESHOLD_FAST = -15;
+    let vsGoalHtml = "";
+    if(i > 0 && Math.abs(e.vsGoal) >= THRESHOLD_WARN){
+      const faster = e.vsGoal < 0;
+      const absMin = Math.abs(e.vsGoal);
+      const h2 = Math.floor(absMin/60), m2 = absMin%60;
+      const t = h2>0?`${h2}h ${m2}m`:`${m2}m`;
+      vsGoalHtml = `<div style="font-size:9px;font-weight:700;color:${faster?"var(--green)":"var(--amber)"}">${faster?"🟢":"🟡"} ${t} ${faster?"ahead of":"behind"} goal pace</div>`;
+    }
+
+    // actual vs ETA diff
+    let actualVsEtaHtml = "";
+    if(hasActual && actualElapsed[i] !== undefined){
+      const diff = actualElapsed[i] - e.minFromStart;
+      if(Math.abs(diff) >= 5){
+        const absMin = Math.abs(diff);
+        const h2 = Math.floor(absMin/60), m2 = absMin%60;
+        const t = h2>0?`${h2}h ${m2}m`:`${m2}m`;
+        actualVsEtaHtml = `<div style="font-size:9px;font-weight:700;color:${diff>0?"var(--amber)":"var(--green)"}">${diff>0?"🟡":"🟢"} ${t} ${diff>0?"behind":"ahead of"} planned ETA</div>`;
+      }
+    }
+
+    let borderStyle = `1px solid ${typeColor}44`;
+    if(i > 0 && e.vsGoal > THRESHOLD_WARN*2) borderStyle = `1.5px solid var(--amber)`;
+    if(i > 0 && e.vsGoal < THRESHOLD_FAST*2) borderStyle = `1.5px solid var(--green)`;
+    if(e.behindCutoff) borderStyle = `2px solid var(--red)`;
+    if(hasActual) borderStyle = `1.5px solid var(--green)`;
+    if(isLast) borderStyle = `2px solid var(--teal)`;
+
+    html += `<div style="background:${bgColor};border:${borderStyle};border-radius:10px;margin-bottom:2px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 12px">
+        <div style="min-width:36px;text-align:center">
+          <div style="font-size:14px;font-weight:800;color:${hasActual?"var(--green)":typeColor}">${fmtMile(s.mile)}</div>
+          <div style="font-size:8px;color:var(--muted)">${unitLabel()}</div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            ${isLast?"📍 ":""}${s.name}
+          </div>
+          <div style="font-size:9px;color:var(--muted)">${fmtElapsed(e.minFromStart)} elapsed${s.cutoff!=="—"?` · cutoff ${s.cutoff}`:""}</div>
+          ${vsGoalHtml}
+          ${actualVsEtaHtml}
+          ${hasActual?`<div style="font-size:9px;color:var(--green);font-weight:700">✓ Actual: ${actual}</div>`:""}
+          ${e.behindCutoff?`<div style="font-size:9px;color:var(--red);font-weight:700">⚠️ BEHIND CUTOFF ${fmtBuffer(e.cutoffBuffer)}</div>`:""}
+          ${e.cutoffBuffer!==null&&!e.behindCutoff&&e.cutoffBuffer<90?`<div style="font-size:9px;color:var(--amber);font-weight:700">⚡ Tight — ${fmtBuffer(e.cutoffBuffer)}</div>`:""}
+        </div>
+        <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <div onclick="openTimeEdit(${i})" style="font-size:15px;font-weight:800;color:${hasActual?"var(--muted)":"var(--text)"};cursor:pointer;padding:2px 6px;border-radius:5px;border:1px solid ${hasOverride?"var(--amber)":"#fff2"};background:${hasOverride?"var(--amber)18":"transparent"};text-decoration:${hasActual?"line-through":"none"}">${e.day} ${e.hhmm}</div>
+          ${hasOverride&&!hasActual?`<div style="font-size:9px;color:var(--amber)">manual <button onclick="clearOverride(${i})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:9px;padding:0">✕</button></div>`:""}
+          <button onclick="openActualLog(${i})" style="background:${hasActual?"var(--green)22":"#fff1"};border:1px solid ${hasActual?"var(--green)":"#fff3"};color:${hasActual?"var(--green)":"var(--muted)"};border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">
+            ${hasActual?"✓ "+actual:"LOG"}
+          </button>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  html += `<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+    <button class="btn sm muted" onclick="clearAllOverrides()">Reset ETAs to auto</button>
+    <button class="btn sm red" onclick="clearAllActuals()">Clear all actuals</button>
+  </div>`;
+
+  return html;
+}
+
+function updateGoalTime(){
+  const h = Number(document.getElementById("goal-h").value)||0;
+  const m = Number(document.getElementById("goal-m").value)||0;
+  mutate(()=>{ STATE.pace.goalHours = h + m/60; STATE.strategy.raceHours = h + m/60; });
+  renderTab("pace");
+}
+
+function updateStartTime(val){
+  mutate(()=>{ STATE.pace.startTime = val; });
+  renderTab("pace");
+}
+
+function openTimeEdit(idx){
+  const etas = computeETAs();
+  const e = etas[idx];
+  const s = e.station;
+  const current = STATE.pace.overrides?.[idx] || e.hhmm;
+
+  openModal(`
+    <h2>Edit ETA: ${s.name}</h2>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:6px">${fmtMile(s.mile)} ${unitLabel()} · Auto: <strong style="color:var(--teal)">${e.day} ${e.hhmm}</strong>${s.cutoff!=="—"?` · Cutoff: <strong style="color:var(--amber)">${s.cutoff}</strong>`:""}</div>
+    <div class="field">
+      <label>Planned arrival (clock time)</label>
+      <input type="time" id="eta-input" value="${current}" style="font-size:20px;font-weight:800;color:var(--teal);text-align:center">
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:14px">Adjusting this will cascade to all subsequent auto stations.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn sm muted" onclick="closeModal()">Cancel</button>
+      ${STATE.pace.overrides?.[idx]!==undefined?`<button class="btn sm red" onclick="clearOverride(${idx})">Clear override</button>`:""}
+      <button class="btn green" onclick="saveTimeOverride(${idx})">Save ETA</button>
+    </div>
+  `);
+}
+
+function openActualLog(idx){
+  const etas = computeETAs();
+  const e = etas[idx];
+  const s = e.station;
+  const current = (STATE.pace.actuals||{})[idx] || e.hhmm;
+
+  openModal(`
+    <h2>Log Arrival: ${s.name}</h2>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Planned ETA: <strong style="color:var(--teal)">${e.day} ${e.hhmm}</strong></div>
+    <div class="field">
+      <label>Actual arrival time (clock time)</label>
+      <input type="time" id="actual-input" value="${current}" style="font-size:24px;font-weight:800;color:var(--green);text-align:center">
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:14px">Crew can log this when Maddy arrives. Syncs to all devices.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn sm muted" onclick="closeModal()">Cancel</button>
+      ${(STATE.pace.actuals||{})[idx]!==undefined?`<button class="btn sm red" onclick="clearActual(${idx})">Clear</button>`:""}
+      <button class="btn green" style="font-size:13px;padding:8px 18px" onclick="saveActual(${idx})">✓ Log Arrival</button>
+    </div>
+  `);
+}
+
+function saveTimeOverride(idx){
+  const val = document.getElementById("eta-input").value;
+  if(!val) return;
+  mutate(()=>{ if(!STATE.pace.overrides) STATE.pace.overrides={}; STATE.pace.overrides[idx]=val; });
+  closeModal(); renderTab("pace");
+}
+
+function saveActual(idx){
+  const val = document.getElementById("actual-input").value;
+  if(!val) return;
+  mutate(()=>{ if(!STATE.pace.actuals) STATE.pace.actuals={}; STATE.pace.actuals[idx]=val; });
+  closeModal(); renderTab("pace");
+}
+
+function clearOverride(idx){
+  mutate(()=>{ delete STATE.pace.overrides[idx]; });
+  closeModal(); renderTab("pace");
+}
+
+function clearActual(idx){
+  mutate(()=>{ delete STATE.pace.actuals[idx]; });
+  closeModal(); renderTab("pace");
+}
+
+function clearAllOverrides(){
+  if(!confirm("Reset all planned ETAs to auto-calculated?")) return;
+  mutate(()=>{ STATE.pace.overrides={}; }); renderTab("pace");
+}
+
+function clearAllActuals(){
+  if(!confirm("Clear all logged arrival times?")) return;
+  mutate(()=>{ STATE.pace.actuals={}; }); renderTab("pace");
+}
+
+// ═══════════════════════════════════════════════════════════
+// FOOD DATABASE
+// ═══════════════════════════════════════════════════════════
+function renderDB(){
+  const cats=["All",...CATS];
+  const catBtns = cats.map(cat=>{
+    const col=CAT_COLORS[cat]||"var(--teal)";
+    const active=dbFilterCat===cat;
+    return `<button class="btn sm" style="background:${active?col+"33":"#fff1"};border-color:${active?col:"#fff3"};color:${active?col:"var(--muted)"}" onclick="setDBFilter('${cat}')">${cat}</button>`;
+  }).join("");
+
+  const items = STATE.nutDB.filter(it=>dbFilterCat==="All"||it.cat===dbFilterCat);
+  const rows = items.map(it=>{
+    const col=CAT_COLORS[it.cat]||"var(--muted)";
+    return `<div class="item-card" style="border-color:${col}22">
+      <div class="item-info">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+          <span class="item-name">${it.name}</span>
+          ${badge(it.cat,col)}
+        </div>
+        <div class="item-meta">${it.cal} cal · ${it.carbs}g carbs · ${it.sodium}mg Na</div>
+        ${it.notes?`<div class="item-note">${it.notes}</div>`:""}
+      </div>
+      <div style="display:flex;gap:4px">
+        <button onclick="openEditItemModal('${it.id}')" style="background:none;border:none;color:var(--teal);font-size:15px;cursor:pointer;padding:0 3px">✏️</button>
+        <button onclick="deleteItem('${it.id}')" style="background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;padding:0 3px">🗑</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700">Nutrition Database <span style="color:var(--muted);font-weight:400">(${STATE.nutDB.length} items)</span></div>
+      <button class="btn sm green" onclick="openAddItemModal()">＋ Add Food</button>
+    </div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">${catBtns}</div>
+    ${rows}`;
+}
+
+function itemForm(item={}){
+  const catOpts = CATS.map(c=>`<option value="${c}" ${item.cat===c?"selected":""}>${c}</option>`).join("");
+  return `
+    <div class="field"><label>Name *</label><input id="fi-name" value="${item.name||""}" placeholder="e.g. Maurten Gel 100"></div>
+    <div class="g2">
+      <div class="field"><label>Calories</label><input id="fi-cal" type="number" value="${item.cal||""}" placeholder="100"></div>
+      <div class="field"><label>Carbs (g)</label><input id="fi-carbs" type="number" value="${item.carbs||""}" placeholder="25"></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Sodium (mg)</label><input id="fi-sodium" type="number" value="${item.sodium||""}" placeholder="55"></div>
+      <div class="field"><label>Category</label><select id="fi-cat">${catOpts}</select></div>
+    </div>
+    <div class="field"><label>Notes</label><input id="fi-notes" value="${item.notes||""}" placeholder="Brand, timing, flavour…"></div>`;
+}
+
+function openAddItemModal(returnLegIdx){
+  openModal(`
+    <h2>Add Food to Database</h2>
+    ${itemForm()}
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn muted sm" onclick="${returnLegIdx!==undefined?`openLegPicker(${returnLegIdx})`:`closeModal()`}">Cancel</button>
+      <button class="btn green" onclick="saveNewItem(${returnLegIdx})">Save to Database</button>
+    </div>`);
+}
+
+function openEditItemModal(itemId){
+  const it = dbItem(itemId);
+  if(!it) return;
+  editingItemId = itemId;
+  openModal(`
+    <h2>Edit Item</h2>
+    ${itemForm(it)}
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn red sm" onclick="deleteItem('${itemId}');closeModal()">Delete</button>
+      <button class="btn muted sm" onclick="closeModal()">Cancel</button>
+      <button class="btn green" onclick="saveEditItem('${itemId}')">Save Changes</button>
+    </div>`);
+}
+
+function readItemForm(){
+  return {
+    name: document.getElementById("fi-name").value.trim(),
+    cal:  Number(document.getElementById("fi-cal").value)||0,
+    carbs:Number(document.getElementById("fi-carbs").value)||0,
+    sodium:Number(document.getElementById("fi-sodium").value)||0,
+    cat:  document.getElementById("fi-cat").value,
+    notes:document.getElementById("fi-notes").value.trim(),
+  };
+}
+
+function saveNewItem(returnLegIdx){
+  const f = readItemForm();
+  if(!f.name){ alert("Name is required"); return; }
+  mutate(()=>STATE.nutDB.push({id:uid(),...f}));
+  toast("Added to database");
+  if(returnLegIdx!==undefined) openLegPicker(returnLegIdx);
+  else{ closeModal(); renderTab("db"); }
+}
+
+function saveEditItem(itemId){
+  const f = readItemForm();
+  if(!f.name){ alert("Name is required"); return; }
+  mutate(()=>{ const idx=STATE.nutDB.findIndex(x=>x.id===itemId); if(idx>=0) STATE.nutDB[idx]={...STATE.nutDB[idx],...f}; });
+  toast("Saved");
+  closeModal(); renderTab("db");
+}
+
+function deleteItem(itemId){
+  if(!confirm("Remove from database?")) return;
+  mutate(()=>{
+    STATE.nutDB = STATE.nutDB.filter(x=>x.id!==itemId);
+    Object.keys(STATE.plan).forEach(k=>{ STATE.plan[k]=(STATE.plan[k]||[]).filter(x=>x.itemId!==itemId); });
+  });
+  toast("Deleted");
+  closeModal(); renderTab("db");
+}
+
+// ═══════════════════════════════════════════════════════════
+// STRATEGY
+// ═══════════════════════════════════════════════════════════
+function renderStrategy(){
+  const s = STATE.strategy;
+  const totalCal = LEGS.reduce((sum,_,i)=>sum+legTotals(i).cal,0);
+  const totalCarbs = LEGS.reduce((sum,_,i)=>sum+legTotals(i).carbs,0);
+  const totalNa = LEGS.reduce((sum,_,i)=>sum+legTotals(i).sodium,0);
+  const hrs = s.raceHours;
+
+  const targetTotalCal   = s.calPerHr * hrs;
+  const targetTotalCarbs = s.carbsPerHr * hrs;
+  const targetTotalNa    = s.sodiumPerHr * hrs;
+  const targetWater      = s.waterPerHr * hrs;
+
+  function bar(actual, target, col){
+    const pct = target>0 ? Math.min(100, Math.round(actual/target*100)) : 0;
+    const ok = pct>=80;
+    return `<div style="margin-top:4px">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:3px">
+        <span>${actual.toLocaleString()} planned</span>
+        <span style="color:${ok?"var(--green)":"var(--amber)"}">${pct}% of target</span>
+      </div>
+      <div style="background:#fff1;border-radius:4px;height:6px;overflow:hidden">
+        <div style="background:${ok?"var(--green)":"var(--amber)"};width:${pct}%;height:100%;border-radius:4px;transition:width .3s"></div>
+      </div>
+    </div>`;
+  }
+
+  return `
+    <div class="sh">Your Hourly Targets</div>
+    <div class="card">
+      ${[
+        ["Race hours (estimate)",  "raceHours",  "hrs",   s.raceHours],
+        ["Calories per hour",      "calPerHr",   "cal/hr",s.calPerHr],
+        ["Carbs per hour",         "carbsPerHr", "g/hr",  s.carbsPerHr],
+        ["Sodium per hour",        "sodiumPerHr","mg/hr", s.sodiumPerHr],
+        ["Water per hour",         "waterPerHr", "ml/hr", s.waterPerHr],
+      ].map(([lbl,key,unit,val])=>`
+        <div class="target-row">
+          <div class="lbl">${lbl}</div>
+          <input type="number" value="${val}" style="width:80px;text-align:right" oninput="updateStrategy('${key}',this.value)">
+          <div class="unit">${unit}</div>
+        </div>`).join("")}
+    </div>
+
+    <div class="sh amber">Plan vs Targets  (${hrs}h race)</div>
+    <div class="card" style="padding:12px 14px">
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--amber)">CALORIES</div>
+        <div style="font-size:10px;color:var(--muted)">Target: ${targetTotalCal.toLocaleString()} cal total · ${s.calPerHr} cal/hr</div>
+        ${bar(totalCal, targetTotalCal, "var(--amber)")}
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--green)">CARBS</div>
+        <div style="font-size:10px;color:var(--muted)">Target: ${targetTotalCarbs}g total · ${s.carbsPerHr}g/hr</div>
+        ${bar(totalCarbs, targetTotalCarbs, "var(--green)")}
+      </div>
+      <div style="margin-bottom:4px">
+        <div style="font-size:11px;font-weight:700;color:var(--teal)">SODIUM</div>
+        <div style="font-size:10px;color:var(--muted)">Target: ${targetTotalNa.toLocaleString()}mg total · ${s.sodiumPerHr}mg/hr</div>
+        ${bar(totalNa, targetTotalNa, "var(--teal)")}
+      </div>
+    </div>
+
+    <div class="sh">Water Target</div>
+    <div class="card" style="padding:12px 14px">
+      <div style="font-size:13px;font-weight:800;color:var(--blue)">${(targetWater/1000).toFixed(1)}L total</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">${s.waterPerHr}ml/hr over ${hrs} hrs</div>
+      <div style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6">
+        ⚠️ Water is not tracked in the fuel plan — use this as a reference. Multiple water crossings and filter points on course. Carry 500–750ml between filterable sources. <strong>CRITICAL: fill to max at Cow Camp before Halfmoon (11.5mi exposed climb).</strong>
+      </div>
+    </div>
+
+    <div class="sh red">🤢 Nausea Reminders</div>
+    ${[
+      ["Switch to savoury immediately","Don't wait — act at first sign"],
+      ["Walk through aid stations","Eating while running kills the gut"],
+      ["Ginger chews after hour 12","Use proactively, not reactively"],
+      ["Cold water on neck","Quick nausea reset on the trail"],
+      ["Never mix gels + sports drink","Double sugar = gut bomb"],
+      ["Coke at every aid station","Carbonation + sugar + caffeine"],
+    ].map(([t,d])=>`<div class="card" style="padding:9px 12px;border-color:#EF444433;display:flex;gap:10px;align-items:flex-start">
+      <span style="font-size:15px">💊</span>
+      <div><div style="font-weight:700;font-size:12px">${t}</div><div style="font-size:11px;color:var(--muted)">${d}</div></div>
+    </div>`).join("")}`;
+}
+
+function updateStrategy(key, val){
+  mutate(()=>{ STATE.strategy[key] = Number(val)||0; });
+}
+
+// ═══════════════════════════════════════════════════════════
+// AID STATIONS
+// ═══════════════════════════════════════════════════════════
+function renderAid(){
+  let html = `<div class="warn-banner">⚠️ 2026: No crew at Huntin Camp · Pacers from Forest Lake must finish · Conical Pass cutoff → 12:15 AM</div>`;
+
+  STATIONS.forEach((s,i)=>{
+    const typeClass = s.type==="warn"?"warn":s.type==="crew"?"crew":"remote";
+    const miCol = s.type==="warn"?"var(--red)":s.priority?"var(--teal)":"var(--blue)";
+    const subCol = s.type==="warn"?"var(--red)":"var(--teal)";
+    const isOpen = STATE.openSections[`as-${i}`];
+
+    const badges = [
+      s.crew?`${badge("CREW","#34D399")}`:"",
+      s.pacer?`${badge("PACER","#2DD4BF")}`:"",
+      s.bag?`${badge("BAG","#60A5FA")}`:"",
+    ].filter(Boolean).join(" ");
+
+    const detail = isOpen ? `<div class="as-detail">
+      <div class="row"><span class="lbl">Leg gap</span><span class="val">${fmtDist(s.delta)}</span></div>
+      <div class="row"><span class="lbl">~Clock (27h)</span><span class="val">${s.clock}</span></div>
+      <div class="row"><span class="lbl">Crew</span><span class="val" style="color:${s.crew?"var(--green)":"var(--muted)"}">${s.crew===true?"✓ Yes":s.crew===false?"✗ No":s.crew}</span></div>
+      <div class="row"><span class="lbl">Drop bag</span><span class="val" style="color:${s.bag?"var(--blue)":"var(--muted)"}">${s.bag?"✓ Yes":"✗ No"}</span></div>
+      <div class="row"><span class="lbl">Pacer</span><span class="val" style="color:${s.pacer?"var(--teal)":"var(--muted)"}">${s.pacer===true?"✓ Yes":s.pacer===false?"✗ No":s.pacer}</span></div>
+      <div class="as-section"><div class="lbl" style="color:var(--amber)">COURSE & LOGISTICS</div>${(STATE.stationNotes[i]||{}).logistics||s.logistics}</div>
+      <div class="as-section"><div class="lbl" style="color:var(--green)">FOOD NEEDS</div>${(STATE.stationNotes[i]||{}).food||s.food}</div>
+      <div class="as-section"><div class="lbl" style="color:var(--blue)">GEAR / ACTION</div>${(STATE.stationNotes[i]||{}).gear||s.gear}</div>
+    </div>` : "";
+
+    html += `<div class="as-card card ${typeClass}" onclick="toggleSection('as-${i}')">
+      <div class="as-header">
+        <div class="as-mile"><div class="mi" style="color:${miCol}">${fmtMile(s.mile)}</div><div class="lbl">${unitLabel()}</div></div>
+        <div class="as-body">
+          <div class="name">${s.name}</div>
+          ${s.sub?`<div class="sub" style="color:${subCol}">${s.sub}</div>`:""}
+          <div class="cutoff">Cutoff: <span style="color:var(--amber);font-weight:600">${s.cutoff}</span> · ${s.clock}</div>
+        </div>
+        <div class="as-badges">${badges}<span style="color:var(--muted);font-size:14px;margin-top:2px">${isOpen?"▲":"▼"}</span></div>
+      </div>
+      ${detail}
+    </div>`;
+  });
+  return html;
+}
+
+function toggleSection(key){
+  STATE.openSections[key] = !STATE.openSections[key];
+  renderTab(activeTab);
+}
+
+// ═══════════════════════════════════════════════════════════
+// GEAR
+// ═══════════════════════════════════════════════════════════
+function renderGear(){
+  const sections = STATE.gearSections;
+  let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div style="font-size:12px;font-weight:700;color:var(--text)">Gear Checklists</div>
+    <button class="btn sm muted" onclick="resetGearToDefault()">↺ Reset to defaults</button>
+  </div>`;
+
+  html += sections.map((sec,si)=>{
+    const done = sec.items.filter((_,ii)=>STATE.gearChecked[`${si}-${ii}`]).length;
+    const isOpen = STATE.openSections[`gear-${si}`];
+    const col = sec.col;
+
+    const items = isOpen ? `<div style="margin-top:4px">` + sec.items.map((it,ii)=>{
+      const key=`${si}-${ii}`, checked=STATE.gearChecked[key];
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <div class="check-row" style="flex:1;background:${checked?col+"18":"var(--card)"};border-color:${col}22;margin-bottom:0" onclick="toggleGear('${key}')">
+          <div class="checkbox" style="border-color:${checked?col:"var(--muted)"};background:${checked?col:"transparent"}">
+            ${checked?`<span style="color:#000;font-size:12px;font-weight:900">✓</span>`:""}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:12px;color:${checked?"var(--muted)":"var(--text)"};text-decoration:${checked?"line-through":"none"}">${it.i}</div>
+            ${it.n?`<div style="font-size:10px;color:var(--muted)">${it.n}</div>`:""}
+          </div>
+        </div>
+        <button onclick="openEditGearItem(${si},${ii})" style="background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;padding:2px 4px;flex-shrink:0">✏️</button>
+        <button onclick="deleteGearItem(${si},${ii})" style="background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:2px 4px;flex-shrink:0">🗑</button>
+      </div>`;
+    }).join("") + `
+      <button class="btn sm green" style="width:100%;margin-top:6px" onclick="openAddGearItem(${si})">＋ Add item to ${sec.name}</button>
+    </div>` : "";
+
+    return `<div style="margin-bottom:12px">
+      <div onclick="toggleSection('gear-${si}')" style="background:${col}18;border:1.5px solid ${col}55;border-radius:10px;padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:800;font-size:12px;color:${col}">${sec.name}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:var(--muted)">${done}/${sec.items.length}</span>
+          <span style="color:var(--muted);font-size:14px">${isOpen?"▲":"▼"}</span>
+        </div>
+      </div>
+      ${items}
+    </div>`;
+  }).join("");
+
+  return html;
+}
+
+function toggleGear(key){
+  STATE.gearChecked[key] = !STATE.gearChecked[key];
+  saveLocal();
+  renderTab("gear");
+}
+
+function gearItemForm(item={}){
+  return `
+    <div class="field"><label>Item name *</label><input id="gi-name" value="${(item.i||"").replace(/"/g,"&quot;")}" placeholder="e.g. Headlamp"></div>
+    <div class="field"><label>Note / detail</label><input id="gi-note" value="${(item.n||"").replace(/"/g,"&quot;")}" placeholder="e.g. With spare batteries"></div>`;
+}
+
+function openAddGearItem(si){
+  openModal(`
+    <h2>Add Gear Item</h2>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Adding to: <strong style="color:var(--text)">${STATE.gearSections[si].name}</strong></div>
+    ${gearItemForm()}
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn sm muted" onclick="closeModal()">Cancel</button>
+      <button class="btn green" onclick="saveNewGearItem(${si})">Add Item</button>
+    </div>`);
+}
+
+function openEditGearItem(si, ii){
+  const item = STATE.gearSections[si].items[ii];
+  openModal(`
+    <h2>Edit Gear Item</h2>
+    ${gearItemForm(item)}
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn sm red" onclick="deleteGearItem(${si},${ii})">Delete</button>
+      <button class="btn sm muted" onclick="closeModal()">Cancel</button>
+      <button class="btn green" onclick="saveEditGearItem(${si},${ii})">Save</button>
+    </div>`);
+}
+
+function saveNewGearItem(si){
+  const name = document.getElementById("gi-name").value.trim();
+  if(!name){ alert("Item name required"); return; }
+  const note = document.getElementById("gi-note").value.trim();
+  mutate(()=>{ STATE.gearSections[si].items.push({i:name,n:note}); });
+  toast("Item added");
+  closeModal(); renderTab("gear");
+}
+
+function saveEditGearItem(si, ii){
+  const name = document.getElementById("gi-name").value.trim();
+  if(!name){ alert("Item name required"); return; }
+  const note = document.getElementById("gi-note").value.trim();
+  mutate(()=>{ STATE.gearSections[si].items[ii] = {i:name, n:note}; });
+  toast("Saved");
+  closeModal(); renderTab("gear");
+}
+
+function deleteGearItem(si, ii){
+  if(!confirm("Remove this item?")) return;
+  mutate(()=>{
+    STATE.gearSections[si].items.splice(ii,1);
+    // clean up checked state for this section
+    const newChecked = {};
+    Object.keys(STATE.gearChecked).forEach(k=>{
+      const [s,i] = k.split("-").map(Number);
+      if(s !== si) newChecked[k] = STATE.gearChecked[k];
+      else if(i < ii) newChecked[k] = STATE.gearChecked[k];
+      else if(i > ii) newChecked[`${s}-${i-1}`] = STATE.gearChecked[k];
+    });
+    STATE.gearChecked = newChecked;
+  });
+  toast("Deleted");
+  closeModal(); renderTab("gear");
+}
+
+function resetGearToDefault(){
+  if(!confirm("Reset all gear lists to defaults? Custom items and checkboxes will be lost.")) return;
+  mutate(()=>{
+    STATE.gearSections = JSON.parse(JSON.stringify(DEFAULT_GEAR_SECTIONS));
+    STATE.gearChecked = {};
+  });
+  toast("Reset to defaults");
+  renderTab("gear");
+}
+
+// ═══════════════════════════════════════════════════════════
+// CREW LOGISTICS
+// ═══════════════════════════════════════════════════════════
+function renderCrew(){
+  const ci = STATE.crewInfo;
+  const driving = ci.driving || [];
+  const decisions = ci.decisions || [];
+  const raceInfo = ci.raceInfo || [];
+  return `
+    <div class="sh">Race Info</div>
+    <div class="card">
+      ${raceInfo.map(({label,value})=>`<div class="row"><span class="lbl">${label}</span><span class="val">${value}</span></div>`).join("")}
+      <div class="row"><span class="lbl">Cutoff pace</span><span class="val">~${fmtPace(21.6)} average</span></div>
+    </div>
+    <div class="sh amber">Crew Driving Guide</div>
+    ${driving.map(l=>`<div class="card ${l.warn?"warn":""}" style="padding:9px 12px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <span style="font-weight:700;font-size:12px">${l.leg}</span>
+        ${badge(l.time,l.warn?"var(--red)":"var(--amber)")}
+      </div>
+      <div style="font-size:11px;color:${l.warn?"#EF4444dd":"var(--muted)"}">${l.note}</div>
+    </div>`).join("")}
+    <div class="sh red">Key Decisions</div>
+    ${decisions.map(({title,body})=>`<div class="card" style="padding:10px 12px;border-color:#F59E0B44;margin-bottom:8px">
+      <div style="font-weight:700;color:var(--amber);font-size:12px;margin-bottom:4px">${title}</div>
+      <div style="font-size:11px;color:var(--dim);line-height:1.5">${body}</div>
+    </div>`).join("")}`;
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// ADMIN
+// ═══════════════════════════════════════════════════════════
+function renderAdmin(){
+  const sections = [
+    {id:"legs",    label:"⛽ Fuel Plan — Leg Notes",    desc:"Edit terrain tags and course notes shown on each leg in the Fuel Plan tab."},
+    {id:"stations",label:"📍 Aid Station Notes",         desc:"Edit the logistics, food needs, and gear/action notes shown when a station is expanded."},
+    {id:"driving", label:"🚗 Crew Driving Guide",         desc:"Edit the driving legs shown in the Crew tab."},
+    {id:"decisions",label:"🔑 Key Crew Decisions",        desc:"Edit the key decision callouts in the Crew tab."},
+    {id:"raceinfo",label:"ℹ️ Race Info",                  desc:"Edit the race info rows in the Crew tab."},
+  ];
+
+  return `
+    <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px">Admin — Edit Content</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Changes sync to crew. Tap a section to expand and edit.</div>
+    ${sections.map(sec=>{
+      const isOpen = STATE.openSections[`admin-${sec.id}`];
+      let body = "";
+      if(isOpen){
+        if(sec.id==="legs")     body = renderAdminLegs();
+        if(sec.id==="stations") body = renderAdminStations();
+        if(sec.id==="driving")  body = renderAdminDriving();
+        if(sec.id==="decisions")body = renderAdminDecisions();
+        if(sec.id==="raceinfo") body = renderAdminRaceInfo();
+      }
+      return `<div style="margin-bottom:10px">
+        <div onclick="toggleSection('admin-${sec.id}')" style="background:var(--card2);border:1px solid #fff2;border-radius:10px;padding:11px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:800;font-size:12px;color:var(--text)">${sec.label}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">${sec.desc}</div>
+          </div>
+          <span style="color:var(--muted);font-size:16px;margin-left:10px;flex-shrink:0">${isOpen?"▲":"▼"}</span>
+        </div>
+        ${isOpen?`<div style="margin-top:6px">${body}</div>`:""}
+      </div>`;
+    }).join("")}`;
+}
+
+// ── LEG NOTES ────────────────────────────────────────────────────────────────
+function renderAdminLegs(){
+  return LEGS.map((leg,i)=>{
+    const override = STATE.legNotes[i] || {};
+    const activeTags = override.tags || leg.tags;
+    const activeCourseNote = override.courseNote !== undefined ? override.courseNote : "";
+    const hasOverride = STATE.legNotes[i] !== undefined;
+    return `<div style="background:var(--card);border-radius:8px;padding:11px 13px;margin-bottom:8px;border:1px solid ${hasOverride?"var(--teal)44":"#fff1"}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div>
+          <div style="font-size:12px;font-weight:700">${leg.from} → ${leg.to}</div>
+          <div style="font-size:10px;color:var(--muted)">${fmtDist(leg.dist)}</div>
+        </div>
+        ${hasOverride?`<button class="btn sm muted" onclick="resetLegNote(${i})">↺ Reset</button>`:""}
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="font-size:10px;color:var(--teal);font-weight:700;margin-bottom:4px">TERRAIN TAGS <span style="color:var(--muted);font-weight:400">(one per line)</span></div>
+        <textarea id="leg-tags-${i}" rows="4" style="background:#0F1F2A;border:1px solid #fff3;border-radius:6px;color:var(--text);padding:7px 10px;font-size:11px;font-family:inherit;width:100%;box-sizing:border-box;resize:vertical;line-height:1.6">${activeTags.join("\n")}</textarea>
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="font-size:10px;color:var(--amber);font-weight:700;margin-bottom:4px">COURSE NOTE <span style="color:var(--muted);font-weight:400">(shown in leg detail)</span></div>
+        <textarea id="leg-note-${i}" rows="3" style="background:#0F1F2A;border:1px solid #fff3;border-radius:6px;color:var(--text);padding:7px 10px;font-size:11px;font-family:inherit;width:100%;box-sizing:border-box;resize:vertical;line-height:1.6">${activeCourseNote}</textarea>
+      </div>
+      <button class="btn sm green" onclick="saveLegNote(${i})">Save leg ${i+1}</button>
+    </div>`;
+  }).join("");
+}
+
+function saveLegNote(i){
+  const tagsRaw = document.getElementById(`leg-tags-${i}`).value;
+  const note    = document.getElementById(`leg-note-${i}`).value.trim();
+  const tags    = tagsRaw.split("\n").map(t=>t.trim()).filter(Boolean);
+  mutate(()=>{
+    STATE.legNotes[i] = {tags, courseNote: note};
+  });
+  toast("Leg note saved");
+  renderTab("admin");
+}
+
+function resetLegNote(i){
+  if(!confirm("Reset this leg to default notes?")) return;
+  mutate(()=>{ delete STATE.legNotes[i]; });
+  toast("Reset to default");
+  renderTab("admin");
+}
+
+// ── STATION NOTES ─────────────────────────────────────────────────────────────
+function renderAdminStations(){
+  return STATIONS.map((s,i)=>{
+    const override = STATE.stationNotes[i] || {};
+    const hasOverride = STATE.stationNotes[i] !== undefined;
+    const logistics  = override.logistics  !== undefined ? override.logistics  : s.logistics;
+    const food       = override.food       !== undefined ? override.food       : s.food;
+    const gear       = override.gear       !== undefined ? override.gear       : s.gear;
+    return `<div style="background:var(--card);border-radius:8px;padding:11px 13px;margin-bottom:8px;border:1px solid ${hasOverride?"var(--teal)44":"#fff1"}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div>
+          <div style="font-size:12px;font-weight:700">${fmtMile(s.mile)} ${unitLabel()} · ${s.name}</div>
+          ${s.sub?`<div style="font-size:10px;color:var(--teal)">${s.sub}</div>`:""}
+        </div>
+        ${hasOverride?`<button class="btn sm muted" onclick="resetStationNote(${i})">↺ Reset</button>`:""}
+      </div>
+      ${[
+        ["stn-logistics-"+i,"COURSE & LOGISTICS","var(--amber)",logistics,4],
+        ["stn-food-"+i,     "FOOD NEEDS",        "var(--green)", food,   2],
+        ["stn-gear-"+i,     "GEAR / ACTION",     "var(--blue)",  gear,   2],
+      ].map(([id,lbl,col,val,rows])=>`
+        <div style="margin-bottom:8px">
+          <div style="font-size:10px;color:${col};font-weight:700;margin-bottom:4px">${lbl}</div>
+          <textarea id="${id}" rows="${rows}" style="background:#0F1F2A;border:1px solid #fff3;border-radius:6px;color:var(--text);padding:7px 10px;font-size:11px;font-family:inherit;width:100%;box-sizing:border-box;resize:vertical;line-height:1.6">${val}</textarea>
+        </div>`).join("")}
+      <button class="btn sm green" onclick="saveStationNote(${i})">Save ${s.name}</button>
+    </div>`;
+  }).join("");
+}
+
+function saveStationNote(i){
+  mutate(()=>{
+    STATE.stationNotes[i] = {
+      logistics: document.getElementById(`stn-logistics-${i}`).value.trim(),
+      food:      document.getElementById(`stn-food-${i}`).value.trim(),
+      gear:      document.getElementById(`stn-gear-${i}`).value.trim(),
+    };
+  });
+  toast("Station note saved");
+  renderTab("admin");
+}
+
+function resetStationNote(i){
+  if(!confirm("Reset to default notes for this station?")) return;
+  mutate(()=>{ delete STATE.stationNotes[i]; });
+  toast("Reset to default");
+  renderTab("admin");
+}
+
+// ── DRIVING GUIDE ──────────────────────────────────────────────────────────────
+function renderAdminDriving(){
+  const driving = STATE.crewInfo.driving;
+  return `
+    ${driving.map((l,i)=>`
+    <div style="background:var(--card);border-radius:8px;padding:11px 13px;margin-bottom:8px;border:1px solid #fff1">
+      <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:8px">Leg ${i+1}: ${l.leg}</div>
+      <div class="g2" style="margin-bottom:8px">
+        <div class="field" style="margin-bottom:0"><label>Drive time</label><input id="drv-time-${i}" value="${l.time}"></div>
+        <div class="field" style="margin-bottom:0">
+          <label>Warning leg?</label>
+          <select id="drv-warn-${i}"><option value="false" ${!l.warn?"selected":""}>No</option><option value="true" ${l.warn?"selected":""}>Yes (red)</option></select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:8px"><label>Note</label><input id="drv-note-${i}" value="${l.note.replace(/"/g,'&quot;')}"></div>
+      <button class="btn sm green" onclick="saveDrivingLeg(${i})">Save</button>
+    </div>`).join("")}
+    <button class="btn sm" style="width:100%;margin-top:4px" onclick="addDrivingLeg()">＋ Add driving leg</button>`;
+}
+
+function saveDrivingLeg(i){
+  mutate(()=>{
+    STATE.crewInfo.driving[i] = {
+      leg:  STATE.crewInfo.driving[i].leg,
+      time: document.getElementById(`drv-time-${i}`).value.trim(),
+      note: document.getElementById(`drv-note-${i}`).value.trim(),
+      warn: document.getElementById(`drv-warn-${i}`).value === "true",
+    };
+  });
+  toast("Saved");
+  renderTab("admin");
+}
+
+function addDrivingLeg(){
+  mutate(()=>{ STATE.crewInfo.driving.push({leg:"New leg",time:"",note:"",warn:false}); });
+  renderTab("admin");
+}
+
+// ── KEY DECISIONS ─────────────────────────────────────────────────────────────
+function renderAdminDecisions(){
+  const decisions = STATE.crewInfo.decisions;
+  return `
+    ${decisions.map((d,i)=>`
+    <div style="background:var(--card);border-radius:8px;padding:11px 13px;margin-bottom:8px;border:1px solid #fff1">
+      <div class="field" style="margin-bottom:8px"><label>Title</label><input id="dec-title-${i}" value="${d.title.replace(/"/g,'&quot;')}"></div>
+      <div class="field" style="margin-bottom:8px"><label>Body</label><textarea id="dec-body-${i}" rows="3" style="background:#0F1F2A;border:1px solid #fff3;border-radius:6px;color:var(--text);padding:7px 10px;font-size:12px;font-family:inherit;width:100%;box-sizing:border-box;resize:vertical">${d.body}</textarea></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn sm red" onclick="deleteDecision(${i})">Delete</button>
+        <button class="btn sm green" onclick="saveDecision(${i})">Save</button>
+      </div>
+    </div>`).join("")}
+    <button class="btn sm" style="width:100%;margin-top:4px" onclick="addDecision()">＋ Add decision</button>`;
+}
+
+function saveDecision(i){
+  mutate(()=>{
+    STATE.crewInfo.decisions[i] = {
+      title: document.getElementById(`dec-title-${i}`).value.trim(),
+      body:  document.getElementById(`dec-body-${i}`).value.trim(),
+    };
+  });
+  toast("Saved");
+  renderTab("admin");
+}
+
+function deleteDecision(i){
+  if(!confirm("Delete this decision?")) return;
+  mutate(()=>{ STATE.crewInfo.decisions.splice(i,1); });
+  renderTab("admin");
+}
+
+function addDecision(){
+  mutate(()=>{ STATE.crewInfo.decisions.push({title:"New decision",body:""}); });
+  renderTab("admin");
+}
+
+// ── RACE INFO ─────────────────────────────────────────────────────────────────
+function renderAdminRaceInfo(){
+  const raceInfo = STATE.crewInfo.raceInfo;
+  return `
+    ${raceInfo.map((row,i)=>`
+    <div style="background:var(--card);border-radius:8px;padding:11px 13px;margin-bottom:8px;border:1px solid #fff1">
+      <div class="g2" style="margin-bottom:4px">
+        <div class="field" style="margin-bottom:0"><label>Label</label><input id="ri-label-${i}" value="${row.label.replace(/"/g,'&quot;')}"></div>
+        <div class="field" style="margin-bottom:0"><label>Value</label><input id="ri-value-${i}" value="${row.value.replace(/"/g,'&quot;')}"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn sm red" onclick="deleteRaceInfo(${i})">Delete</button>
+        <button class="btn sm green" onclick="saveRaceInfo(${i})">Save</button>
+      </div>
+    </div>`).join("")}
+    <button class="btn sm" style="width:100%;margin-top:4px" onclick="addRaceInfo()">＋ Add row</button>`;
+}
+
+function saveRaceInfo(i){
+  mutate(()=>{
+    STATE.crewInfo.raceInfo[i] = {
+      label: document.getElementById(`ri-label-${i}`).value.trim(),
+      value: document.getElementById(`ri-value-${i}`).value.trim(),
+    };
+  });
+  toast("Saved");
+  renderTab("admin");
+}
+
+function deleteRaceInfo(i){
+  if(!confirm("Delete this row?")) return;
+  mutate(()=>{ STATE.crewInfo.raceInfo.splice(i,1); });
+  renderTab("admin");
+}
+
+function addRaceInfo(){
+  mutate(()=>{ STATE.crewInfo.raceInfo.push({label:"",value:""}); });
+  renderTab("admin");
+}
+
+// ═══════════════════════════════════════════════════════════
+// SETTINGS / SYNC
+// ═══════════════════════════════════════════════════════════
+function renderSettings(){
+  const ready = syncReady();
+  return `
+    <!-- STATUS -->
+    <div style="background:${ready?"var(--green)":"var(--warn)"}18;border:1px solid ${ready?"var(--green)":"var(--red)"}44;border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <div style="font-size:20px">${ready?"✅":"❌"}</div>
+      <div>
+        <div style="font-size:12px;font-weight:800;color:${ready?"var(--green)":"var(--red)"}">${ready?"Sync connected — GitHub Gist":"Sync not configured"}</div>
+        <div style="font-size:10px;color:var(--muted)">${ready?`Gist ID: ${STATE.gistId}`:"Follow the steps below to set up crew sharing"}</div>
+      </div>
+      ${ready?`<button class="btn sm muted" style="margin-left:auto" onclick="testSync()">Test</button>`:""}
+    </div>
+
+    <!-- STEP 1: CREATE GIST -->
+    <div style="font-size:11px;font-weight:800;color:var(--teal);letter-spacing:1px;margin-bottom:6px">STEP 1 — CREATE A GITHUB GIST</div>
+    <div class="card" style="padding:14px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--dim);line-height:1.8;margin-bottom:10px">
+        A GitHub Gist is a free, permanent cloud file — no expiry, no request limits for normal use. You need a GitHub account (you already have one).
+      </div>
+      ${[
+        [`Go to <strong style="color:var(--teal)">gist.github.com</strong>`, "You'll need to be logged in to your GitHub account."],
+        [`Set filename to exactly: <code style="background:#0a1520;color:var(--teal);padding:2px 6px;border-radius:3px">cm100_plan.json</code>`, "The filename must match exactly — the app looks for this specific file."],
+        [`Paste this as the content:`, `<div style="background:#0a1520;border:1px solid var(--teal)44;border-radius:6px;padding:8px 10px;margin-top:6px;font-family:monospace;font-size:10px;color:var(--teal);word-break:break-all">{"nutDB":[],"plan":{},"strategy":{},"pace":{},"gearSections":[],"legNotes":{},"stationNotes":{},"crewInfo":{}}</div>`],
+        [`Click <strong>Create secret gist</strong>`, "Secret means it won't show up in search results, but anyone with the ID can read it."],
+        [`Copy the Gist ID from the URL`, `The URL looks like <code style="background:#0a1520;color:var(--teal);padding:1px 5px;border-radius:3px">gist.github.com/username/abc123def456</code> — the ID is the last part.`],
+      ].map(([step,detail],i)=>`
+        <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start">
+          <div style="background:var(--teal);color:#000;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex-shrink:0;margin-top:1px">${i+1}</div>
+          <div style="font-size:11px;color:var(--dim);line-height:1.6"><span style="color:var(--text)">${step}</span>${detail?`<br>${detail}`:""}</div>
+        </div>`).join("")}
+    </div>
+
+    <!-- STEP 2: CREATE TOKEN -->
+    <div style="font-size:11px;font-weight:800;color:var(--amber);letter-spacing:1px;margin-bottom:6px">STEP 2 — CREATE A GITHUB TOKEN</div>
+    <div class="card" style="padding:14px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--dim);line-height:1.8;margin-bottom:10px">
+        The app needs a token to write to your Gist. This is a read/write key — keep it private (don't share the token itself, only the Gist ID).
+      </div>
+      ${[
+        [`Go to <strong style="color:var(--amber)">github.com/settings/tokens</strong>`, "GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)."],
+        [`Click <strong>Generate new token (classic)</strong>`, "Give it a name like <em>cm100-crew</em> and set expiration to 90 days (past race day)."],
+        [`Check only the <strong>gist</strong> scope`, "That's the only permission needed. Don't check anything else."],
+        [`Click <strong>Generate token</strong> and copy it immediately`, "GitHub only shows it once. Paste it below right away."],
+      ].map(([step,detail],i)=>`
+        <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start">
+          <div style="background:var(--amber);color:#000;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex-shrink:0;margin-top:1px">${i+1}</div>
+          <div style="font-size:11px;color:var(--dim);line-height:1.6"><span style="color:var(--text)">${step}</span>${detail?`<br>${detail}`:""}</div>
+        </div>`).join("")}
+    </div>
+
+    <!-- STEP 3: CONNECT -->
+    <div style="font-size:11px;font-weight:800;color:var(--green);letter-spacing:1px;margin-bottom:6px">STEP 3 — CONNECT</div>
+    <div class="card" style="padding:14px;margin-bottom:12px">
+      <div class="field">
+        <label>Gist ID <span style="color:var(--muted);font-weight:400">(from the URL)</span></label>
+        <input id="gist-id-input" value="${STATE.gistId}" placeholder="e.g. abc123def456abc123def456abc12345">
+      </div>
+      <div class="field">
+        <label>GitHub Token <span style="color:var(--muted);font-weight:400">(ghp_… — stored locally only)</span></label>
+        <input id="gist-token-input" type="password" value="${STATE.gistToken}" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+        ⚠️ The token is stored only in your browser's local storage — it never leaves your device except to call the GitHub API. Crew members use <strong>read-only</strong> tokens (or you can share a crew-specific one with gist scope only).
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn green" onclick="saveGistConfig()" style="flex:1;padding:10px">Save & Connect</button>
+        ${ready?`<button class="btn sm red" onclick="clearGistConfig()">Disconnect</button>`:""}
+      </div>
+    </div>
+
+    <!-- STEP 4: SHARE WITH CREW -->
+    <div style="font-size:11px;font-weight:800;color:var(--purple);letter-spacing:1px;margin-bottom:6px">STEP 4 — SHARE WITH CREW</div>
+    <div class="card" style="padding:14px;margin-bottom:12px">
+      ${[
+        ["Share the app URL","Text crew: <code style='background:#0a1520;color:var(--purple);padding:1px 4px;border-radius:3px'>mclairewrazej-goatgirl.github.io/cm100-crew</code> — they open it in Safari or Chrome."],
+        ["Give them the Gist ID","They go to ⚙️ Sync → paste the same Gist ID. For the token, create a second token with gist scope for crew, or share yours (it only has gist access)."],
+        ["Add to home screen","iOS: Safari → Share → Add to Home Screen. Android: Chrome → menu → Add to Home Screen. Works offline from then on."],
+        ["Designate one tracker","Whoever has the best signal at each aid station logs arrivals. Everyone else reads — plan is always cached offline."],
+      ].map(([t,b],i)=>`
+        <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start">
+          <div style="background:var(--purple);color:#000;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex-shrink:0;margin-top:1px">${i+1}</div>
+          <div style="font-size:11px;line-height:1.6"><span style="color:var(--text);font-weight:700">${t}</span><br><span style="color:var(--muted)">${b}</span></div>
+        </div>`).join("")}
+    </div>
+
+    <!-- HOW SYNC WORKS -->
+    <div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:1px;margin-bottom:6px">HOW SYNC WORKS ON RACE DAY</div>
+    <div class="card" style="padding:12px 14px;margin-bottom:12px">
+      ${[
+        ["✅","Works offline","Full plan is cached on every device. No signal = still works as a reference."],
+        ["🔄","Auto-syncs every 20s","When signal is available, all devices poll GitHub for updates automatically."],
+        ["📍","Log arrivals","Crew member taps LOG at each station → syncs to all devices within ~20 seconds."],
+        ["⚠️","Last write wins","If two people edit without signal, last one to sync wins. Designate one tracker."],
+        ["♾️","No expiry","GitHub Gists don't expire. Your plan persists indefinitely."],
+        ["🔋","Battery tip","Keep screen brightness low. Airplane mode + WiFi when at aid stations with WiFi."],
+      ].map(([icon,t,b])=>`
+        <div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #fff1;align-items:flex-start">
+          <span style="font-size:14px;flex-shrink:0">${icon}</span>
+          <div style="font-size:11px;line-height:1.5"><span style="color:var(--text);font-weight:700">${t}</span><br><span style="color:var(--muted)">${b}</span></div>
+        </div>`).join("")}
+    </div>
+
+    <!-- DANGER ZONE -->
+    <div class="sh red">Danger Zone</div>
+    <div class="card" style="padding:12px 14px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Resets fuel plan data only. Aid station notes, gear lists, and crew info are not affected.</div>
+      <button class="btn red sm" onclick="resetPlan()">Reset fuel plan</button>
+    </div>`;
+}
+
+function saveGistConfig(){
+  const id    = document.getElementById("gist-id-input").value.trim();
+  const token = document.getElementById("gist-token-input").value.trim();
+  STATE.gistId    = id;
+  STATE.gistToken = token;
+  saveLocal();
+  if(id && token) loadFromGist();
+  renderTab("settings");
+  toast(id && token ? "Connected to GitHub Gist!" : "Cleared");
+}
+
+function clearGistConfig(){
+  if(!confirm("Disconnect from sync? Your local plan stays intact.")) return;
+  STATE.gistId = ""; STATE.gistToken = "";
+  saveLocal();
+  setSyncStatus("err","Not configured");
+  renderTab("settings");
+  toast("Disconnected");
+}
+
+async function testSync(){
+  await pushToGist();
+  toast("Sync test complete — check status bar");
+}
+
+function resetPlan(){
+  if(!confirm("Reset all fuel plan data? This cannot be undone.")) return;
+  mutate(()=>{ STATE.plan={}; });
+  renderTab("fuel");
+  toast("Plan reset");
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+document.addEventListener("DOMContentLoaded",()=>{
+  loadLocal();
+  try{ useMetric = localStorage.getItem("cm100_metric") === "1"; }catch(e){}
+  document.getElementById("unit-toggle").textContent = useMetric ? "km/m" : "mi/ft";
+  renderTab("fuel");
+  startPolling();
+  if(syncReady()){
+    loadFromGist();
+    setSyncStatus("spin","Connecting…");
+  } else {
+    setSyncStatus("err","Not configured — see ⚙️ Sync tab");
+  }
+  // Visibility change → sync on return
+  document.addEventListener("visibilitychange",()=>{
+    if(!document.hidden && syncReady()) loadFromGist();
+  });
+});
+</script>
+</body>
+</html>
