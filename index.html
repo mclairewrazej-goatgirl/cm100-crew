@@ -387,6 +387,7 @@ let STATE = {
       {label:"Finish",        value:"41 Berg Rd, Martinsdale MT"},
       {label:"RD email",      value:"megandehaan@crazymountainultra.com"},
       {label:"Drop bags due", value:"Thu Jul 24 · 3–7 PM at Berg Ranch"},
+      {label:"Runner tracking", value:"https://www.trackleaders.com/"},
     ],
   },
 };
@@ -1695,7 +1696,7 @@ function renderCrew(){
   return `
     <div class="sh">Race Info</div>
     <div class="card">
-      ${raceInfo.map(({label,value})=>`<div class="row"><span class="lbl">${label}</span><span class="val">${value}</span></div>`).join("")}
+      ${raceInfo.map(({label,value})=>`<div class="row"><span class="lbl">${label}</span><span class="val">${/^https?:\/\//i.test(value)?`<a href="${value}" target="_blank" rel="noopener" style="color:var(--teal)">${value}</a>`:value}</span></div>`).join("")}
       <div class="row"><span class="lbl">Cutoff pace</span><span class="val">~${fmtPace(21.6)} average</span></div>
     </div>
     <div class="sh amber">Crew Driving Guide</div>
