@@ -339,6 +339,12 @@ const DEFAULT_GEAR_SECTIONS = [
 let STATE = {
   gistId: "",      // GitHub Gist ID
   gistToken: "",   // GitHub personal access token (gist scope)
+  // Per-section timestamps used to merge local edits with incoming Gist data
+  // instead of blindly overwriting one with the other.
+  lastModified: {
+    nutDB: Date.now(), plan: Date.now(), strategy: Date.now(), pace: Date.now(),
+    gearSections: Date.now(), legNotes: Date.now(), stationNotes: Date.now(), crewInfo: Date.now(),
+  },
   nutDB: JSON.parse(JSON.stringify(DEFAULT_DB)),
   plan: {},
   strategy: {
@@ -460,6 +466,16 @@ function gistHeaders(){
   };
 }
 
+const SYNCED_KEYS = ["nutDB","plan","strategy","pace","gearSections","legNotes","stationNotes","crewInfo"];
+
+// Treats empty/default values (the shape of a freshly-created, never-pushed
+// Gist) as "no real data" so they can't stomp real local data on merge.
+function isEmptySection(v){
+  if(Array.isArray(v)) return v.length===0;
+  if(v && typeof v==="object") return Object.keys(v).length===0;
+  return !v;
+}
+
 async function loadFromGist(){
   if(!syncReady()) return;
   setSyncStatus("spin","Syncing…");
@@ -472,17 +488,36 @@ async function loadFromGist(){
     const incoming = raw;
     if(incoming !== lastSyncedJSON){
       const data = JSON.parse(raw);
-      if(data.nutDB)       STATE.nutDB        = data.nutDB;
-      if(data.plan)        STATE.plan         = data.plan;
-      if(data.strategy)    STATE.strategy     = {...STATE.strategy,...data.strategy};
-      if(data.pace)        STATE.pace         = {...STATE.pace,...data.pace};
-      if(data.gearSections)STATE.gearSections = data.gearSections;
-      if(data.legNotes)    STATE.legNotes     = data.legNotes;
-      if(data.stationNotes)STATE.stationNotes = data.stationNotes;
-      if(data.crewInfo)    STATE.crewInfo     = {...STATE.crewInfo,...data.crewInfo};
+      const incomingTs = data.lastModified || {};
+
+      // First sync against an uninitialised Gist (still holding the default
+      // empty shape): seed it from local state instead of wiping local data.
+      const gistUninitialised = SYNCED_KEYS.every(k=>isEmptySection(data[k]));
+      const localHasData = SYNCED_KEYS.some(k=>!isEmptySection(STATE[k]));
+      if(gistUninitialised && localHasData){
+        await pushToGist();
+        return;
+      }
+
+      let changed = false;
+      SYNCED_KEYS.forEach(k=>{
+        if(data[k] === undefined) return;
+        // Never let an empty incoming section clobber real local data, even
+        // if its timestamp looks newer.
+        if(isEmptySection(data[k]) && !isEmptySection(STATE[k])) return;
+        const localTs = STATE.lastModified[k] || 0;
+        const remoteTs = incomingTs[k] || 0;
+        if(remoteTs <= localTs) return;
+        STATE[k] = data[k];
+        STATE.lastModified[k] = remoteTs;
+        changed = true;
+      });
+
       lastSyncedJSON = incoming;
-      saveLocal();
-      renderTab(activeTab);
+      if(changed){
+        saveLocal();
+        renderTab(activeTab);
+      }
     }
     setSyncStatus("ok","Synced");
   } catch(e){
@@ -494,7 +529,8 @@ async function pushToGist(){
   if(!syncReady()) return;
   setSyncStatus("spin","Saving…");
   try{
-    const payload = {nutDB:STATE.nutDB, plan:STATE.plan, strategy:STATE.strategy, pace:STATE.pace, gearSections:STATE.gearSections, legNotes:STATE.legNotes, stationNotes:STATE.stationNotes, crewInfo:STATE.crewInfo};
+    const payload = {lastModified: STATE.lastModified};
+    SYNCED_KEYS.forEach(k=>{ payload[k] = STATE[k]; });
     const body = JSON.stringify(payload, null, 2);
     if(body === lastSyncedJSON){ setSyncStatus("ok","Synced"); return; }
     const r = await fetch(`https://api.github.com/gists/${STATE.gistId}`, {
@@ -573,8 +609,12 @@ function toast(msg){
   setTimeout(()=>t.style.display="none", 2000);
 }
 
-function mutate(fn){
+// keys: the top-level STATE sections touched by fn, so their lastModified
+// timestamps can be bumped (used to merge with incoming Gist data on pull).
+function mutate(fn, ...keys){
   fn();
+  const now = Date.now();
+  keys.forEach(k=>{ STATE.lastModified[k] = now; });
   saveLocal();
   schedulePush();
 }
@@ -766,7 +806,7 @@ function changeLegQty(legIdx, itemId, qty){
       : ex.find(x=>x.itemId===itemId)
         ? ex.map(x=>x.itemId===itemId?{...x,qty}:x)
         : [...ex,{itemId,qty}];
-  });
+  }, "plan");
   renderLegModal(legIdx);
   renderTab("fuel");
 }
@@ -818,7 +858,7 @@ function addToLeg(legIdx, itemId){
     const key=legKey(legIdx), ex=STATE.plan[key]||[];
     const fi=ex.findIndex(x=>x.itemId===itemId);
     STATE.plan[key] = fi>=0 ? ex.map((x,i)=>i===fi?{...x,qty:x.qty+1}:x) : [...ex,{itemId,qty:1}];
-  });
+  }, "plan");
   openLegPicker(legIdx);
   renderTab("fuel");
 }
@@ -1169,12 +1209,12 @@ function renderPace(){
 function updateGoalTime(){
   const h = Number(document.getElementById("goal-h").value)||0;
   const m = Number(document.getElementById("goal-m").value)||0;
-  mutate(()=>{ STATE.pace.goalHours = h + m/60; STATE.strategy.raceHours = h + m/60; });
+  mutate(()=>{ STATE.pace.goalHours = h + m/60; STATE.strategy.raceHours = h + m/60; }, "pace", "strategy");
   renderTab("pace");
 }
 
 function updateStartTime(val){
-  mutate(()=>{ STATE.pace.startTime = val; });
+  mutate(()=>{ STATE.pace.startTime = val; }, "pace");
   renderTab("pace");
 }
 
@@ -1225,35 +1265,35 @@ function openActualLog(idx){
 function saveTimeOverride(idx){
   const val = document.getElementById("eta-input").value;
   if(!val) return;
-  mutate(()=>{ if(!STATE.pace.overrides) STATE.pace.overrides={}; STATE.pace.overrides[idx]=val; });
+  mutate(()=>{ if(!STATE.pace.overrides) STATE.pace.overrides={}; STATE.pace.overrides[idx]=val; }, "pace");
   closeModal(); renderTab("pace");
 }
 
 function saveActual(idx){
   const val = document.getElementById("actual-input").value;
   if(!val) return;
-  mutate(()=>{ if(!STATE.pace.actuals) STATE.pace.actuals={}; STATE.pace.actuals[idx]=val; });
+  mutate(()=>{ if(!STATE.pace.actuals) STATE.pace.actuals={}; STATE.pace.actuals[idx]=val; }, "pace");
   closeModal(); renderTab("pace");
 }
 
 function clearOverride(idx){
-  mutate(()=>{ delete STATE.pace.overrides[idx]; });
+  mutate(()=>{ delete STATE.pace.overrides[idx]; }, "pace");
   closeModal(); renderTab("pace");
 }
 
 function clearActual(idx){
-  mutate(()=>{ delete STATE.pace.actuals[idx]; });
+  mutate(()=>{ delete STATE.pace.actuals[idx]; }, "pace");
   closeModal(); renderTab("pace");
 }
 
 function clearAllOverrides(){
   if(!confirm("Reset all planned ETAs to auto-calculated?")) return;
-  mutate(()=>{ STATE.pace.overrides={}; }); renderTab("pace");
+  mutate(()=>{ STATE.pace.overrides={}; }, "pace"); renderTab("pace");
 }
 
 function clearAllActuals(){
   if(!confirm("Clear all logged arrival times?")) return;
-  mutate(()=>{ STATE.pace.actuals={}; }); renderTab("pace");
+  mutate(()=>{ STATE.pace.actuals={}; }, "pace"); renderTab("pace");
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1348,7 +1388,7 @@ function readItemForm(){
 function saveNewItem(returnLegIdx){
   const f = readItemForm();
   if(!f.name){ alert("Name is required"); return; }
-  mutate(()=>STATE.nutDB.push({id:uid(),...f}));
+  mutate(()=>STATE.nutDB.push({id:uid(),...f}), "nutDB");
   toast("Added to database");
   if(returnLegIdx!==undefined) openLegPicker(returnLegIdx);
   else{ closeModal(); renderTab("db"); }
@@ -1357,7 +1397,7 @@ function saveNewItem(returnLegIdx){
 function saveEditItem(itemId){
   const f = readItemForm();
   if(!f.name){ alert("Name is required"); return; }
-  mutate(()=>{ const idx=STATE.nutDB.findIndex(x=>x.id===itemId); if(idx>=0) STATE.nutDB[idx]={...STATE.nutDB[idx],...f}; });
+  mutate(()=>{ const idx=STATE.nutDB.findIndex(x=>x.id===itemId); if(idx>=0) STATE.nutDB[idx]={...STATE.nutDB[idx],...f}; }, "nutDB");
   toast("Saved");
   closeModal(); renderTab("db");
 }
@@ -1367,7 +1407,7 @@ function deleteItem(itemId){
   mutate(()=>{
     STATE.nutDB = STATE.nutDB.filter(x=>x.id!==itemId);
     Object.keys(STATE.plan).forEach(k=>{ STATE.plan[k]=(STATE.plan[k]||[]).filter(x=>x.itemId!==itemId); });
-  });
+  }, "nutDB", "plan");
   toast("Deleted");
   closeModal(); renderTab("db");
 }
@@ -1461,7 +1501,7 @@ function renderStrategy(){
 }
 
 function updateStrategy(key, val){
-  mutate(()=>{ STATE.strategy[key] = Number(val)||0; });
+  mutate(()=>{ STATE.strategy[key] = Number(val)||0; }, "strategy");
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1602,7 +1642,7 @@ function saveNewGearItem(si){
   const name = document.getElementById("gi-name").value.trim();
   if(!name){ alert("Item name required"); return; }
   const note = document.getElementById("gi-note").value.trim();
-  mutate(()=>{ STATE.gearSections[si].items.push({i:name,n:note}); });
+  mutate(()=>{ STATE.gearSections[si].items.push({i:name,n:note}); }, "gearSections");
   toast("Item added");
   closeModal(); renderTab("gear");
 }
@@ -1611,7 +1651,7 @@ function saveEditGearItem(si, ii){
   const name = document.getElementById("gi-name").value.trim();
   if(!name){ alert("Item name required"); return; }
   const note = document.getElementById("gi-note").value.trim();
-  mutate(()=>{ STATE.gearSections[si].items[ii] = {i:name, n:note}; });
+  mutate(()=>{ STATE.gearSections[si].items[ii] = {i:name, n:note}; }, "gearSections");
   toast("Saved");
   closeModal(); renderTab("gear");
 }
@@ -1629,7 +1669,7 @@ function deleteGearItem(si, ii){
       else if(i > ii) newChecked[`${s}-${i-1}`] = STATE.gearChecked[k];
     });
     STATE.gearChecked = newChecked;
-  });
+  }, "gearSections");
   toast("Deleted");
   closeModal(); renderTab("gear");
 }
@@ -1639,7 +1679,7 @@ function resetGearToDefault(){
   mutate(()=>{
     STATE.gearSections = JSON.parse(JSON.stringify(DEFAULT_GEAR_SECTIONS));
     STATE.gearChecked = {};
-  });
+  }, "gearSections");
   toast("Reset to defaults");
   renderTab("gear");
 }
@@ -1746,14 +1786,14 @@ function saveLegNote(i){
   const tags    = tagsRaw.split("\n").map(t=>t.trim()).filter(Boolean);
   mutate(()=>{
     STATE.legNotes[i] = {tags, courseNote: note};
-  });
+  }, "legNotes");
   toast("Leg note saved");
   renderTab("admin");
 }
 
 function resetLegNote(i){
   if(!confirm("Reset this leg to default notes?")) return;
-  mutate(()=>{ delete STATE.legNotes[i]; });
+  mutate(()=>{ delete STATE.legNotes[i]; }, "legNotes");
   toast("Reset to default");
   renderTab("admin");
 }
@@ -1795,14 +1835,14 @@ function saveStationNote(i){
       food:      document.getElementById(`stn-food-${i}`).value.trim(),
       gear:      document.getElementById(`stn-gear-${i}`).value.trim(),
     };
-  });
+  }, "stationNotes");
   toast("Station note saved");
   renderTab("admin");
 }
 
 function resetStationNote(i){
   if(!confirm("Reset to default notes for this station?")) return;
-  mutate(()=>{ delete STATE.stationNotes[i]; });
+  mutate(()=>{ delete STATE.stationNotes[i]; }, "stationNotes");
   toast("Reset to default");
   renderTab("admin");
 }
@@ -1835,13 +1875,13 @@ function saveDrivingLeg(i){
       note: document.getElementById(`drv-note-${i}`).value.trim(),
       warn: document.getElementById(`drv-warn-${i}`).value === "true",
     };
-  });
+  }, "crewInfo");
   toast("Saved");
   renderTab("admin");
 }
 
 function addDrivingLeg(){
-  mutate(()=>{ STATE.crewInfo.driving.push({leg:"New leg",time:"",note:"",warn:false}); });
+  mutate(()=>{ STATE.crewInfo.driving.push({leg:"New leg",time:"",note:"",warn:false}); }, "crewInfo");
   renderTab("admin");
 }
 
@@ -1867,19 +1907,19 @@ function saveDecision(i){
       title: document.getElementById(`dec-title-${i}`).value.trim(),
       body:  document.getElementById(`dec-body-${i}`).value.trim(),
     };
-  });
+  }, "crewInfo");
   toast("Saved");
   renderTab("admin");
 }
 
 function deleteDecision(i){
   if(!confirm("Delete this decision?")) return;
-  mutate(()=>{ STATE.crewInfo.decisions.splice(i,1); });
+  mutate(()=>{ STATE.crewInfo.decisions.splice(i,1); }, "crewInfo");
   renderTab("admin");
 }
 
 function addDecision(){
-  mutate(()=>{ STATE.crewInfo.decisions.push({title:"New decision",body:""}); });
+  mutate(()=>{ STATE.crewInfo.decisions.push({title:"New decision",body:""}); }, "crewInfo");
   renderTab("admin");
 }
 
@@ -1907,19 +1947,19 @@ function saveRaceInfo(i){
       label: document.getElementById(`ri-label-${i}`).value.trim(),
       value: document.getElementById(`ri-value-${i}`).value.trim(),
     };
-  });
+  }, "crewInfo");
   toast("Saved");
   renderTab("admin");
 }
 
 function deleteRaceInfo(i){
   if(!confirm("Delete this row?")) return;
-  mutate(()=>{ STATE.crewInfo.raceInfo.splice(i,1); });
+  mutate(()=>{ STATE.crewInfo.raceInfo.splice(i,1); }, "crewInfo");
   renderTab("admin");
 }
 
 function addRaceInfo(){
-  mutate(()=>{ STATE.crewInfo.raceInfo.push({label:"",value:""}); });
+  mutate(()=>{ STATE.crewInfo.raceInfo.push({label:"",value:""}); }, "crewInfo");
   renderTab("admin");
 }
 
@@ -2063,7 +2103,7 @@ async function testSync(){
 
 function resetPlan(){
   if(!confirm("Reset all fuel plan data? This cannot be undone.")) return;
-  mutate(()=>{ STATE.plan={}; });
+  mutate(()=>{ STATE.plan={}; }, "plan");
   renderTab("fuel");
   toast("Plan reset");
 }
