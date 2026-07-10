@@ -340,10 +340,13 @@ let STATE = {
   gistId: "",      // GitHub Gist ID
   gistToken: "",   // GitHub personal access token (gist scope)
   // Per-section timestamps used to merge local edits with incoming Gist data
-  // instead of blindly overwriting one with the other.
+  // instead of blindly overwriting one with the other. Default to 0 (not
+  // Date.now()) so a device that has never made a real edit — e.g. a crew
+  // member's first-ever page load — never outranks real synced data during
+  // the timestamp comparison in loadFromGist().
   lastModified: {
-    nutDB: Date.now(), plan: Date.now(), strategy: Date.now(), pace: Date.now(),
-    gearSections: Date.now(), legNotes: Date.now(), stationNotes: Date.now(), crewInfo: Date.now(),
+    nutDB: 0, plan: 0, strategy: 0, pace: 0,
+    gearSections: 0, legNotes: 0, stationNotes: 0, crewInfo: 0,
   },
   nutDB: JSON.parse(JSON.stringify(DEFAULT_DB)),
   plan: {},
