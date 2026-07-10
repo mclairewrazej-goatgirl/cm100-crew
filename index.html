@@ -1267,34 +1267,34 @@ function saveTimeOverride(idx){
   const val = document.getElementById("eta-input").value;
   if(!val) return;
   mutate(()=>{ if(!STATE.pace.overrides) STATE.pace.overrides={}; STATE.pace.overrides[idx]=val; }, "pace");
-  closeModal(); renderTab("pace");
+  closeModal(); renderTab(activeTab);
 }
 
 function saveActual(idx){
   const val = document.getElementById("actual-input").value;
   if(!val) return;
   mutate(()=>{ if(!STATE.pace.actuals) STATE.pace.actuals={}; STATE.pace.actuals[idx]=val; }, "pace");
-  closeModal(); renderTab("pace");
+  closeModal(); renderTab(activeTab);
 }
 
 function clearOverride(idx){
   mutate(()=>{ delete STATE.pace.overrides[idx]; }, "pace");
-  closeModal(); renderTab("pace");
+  closeModal(); renderTab(activeTab);
 }
 
 function clearActual(idx){
   mutate(()=>{ delete STATE.pace.actuals[idx]; }, "pace");
-  closeModal(); renderTab("pace");
+  closeModal(); renderTab(activeTab);
 }
 
 function clearAllOverrides(){
   if(!confirm("Reset all planned ETAs to auto-calculated?")) return;
-  mutate(()=>{ STATE.pace.overrides={}; }, "pace"); renderTab("pace");
+  mutate(()=>{ STATE.pace.overrides={}; }, "pace"); renderTab(activeTab);
 }
 
 function clearAllActuals(){
   if(!confirm("Clear all logged arrival times?")) return;
-  mutate(()=>{ STATE.pace.actuals={}; }, "pace"); renderTab("pace");
+  mutate(()=>{ STATE.pace.actuals={}; }, "pace"); renderTab(activeTab);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1509,6 +1509,11 @@ function updateStrategy(key, val){
 // AID STATIONS
 // ═══════════════════════════════════════════════════════════
 function renderAid(){
+  const etas = computeETAs();
+  const goalH = Math.floor(STATE.pace.goalHours);
+  const goalM = Math.round((STATE.pace.goalHours - goalH) * 60);
+  const goalLabel = goalM > 0 ? `${goalH}h ${goalM}m` : `${goalH}h`;
+
   let html = `<div class="warn-banner">⚠️ 2026: No crew at Huntin Camp · Pacers from Forest Lake must finish · Conical Pass cutoff → 12:15 AM</div>`;
 
   STATIONS.forEach((s,i)=>{
@@ -1516,6 +1521,10 @@ function renderAid(){
     const miCol = s.type==="warn"?"var(--red)":s.priority?"var(--teal)":"var(--blue)";
     const subCol = s.type==="warn"?"var(--red)":"var(--teal)";
     const isOpen = STATE.openSections[`as-${i}`];
+
+    const eta = etas[i];
+    const etaColor = eta.behindCutoff ? "var(--red)" : eta.hasOverride ? "var(--amber)" : "var(--teal)";
+    const etaLine = `${eta.day} ${eta.hhmm}${eta.hasOverride?" 📌":""}`;
 
     const badges = [
       s.crew?`${badge("CREW","#34D399")}`:"",
@@ -1525,7 +1534,12 @@ function renderAid(){
 
     const detail = isOpen ? `<div class="as-detail">
       <div class="row"><span class="lbl">Leg gap</span><span class="val">${fmtDist(s.delta)}</span></div>
-      <div class="row"><span class="lbl">~Clock (27h)</span><span class="val">${s.clock}</span></div>
+      <div class="row" onclick="event.stopPropagation(); openTimeEdit(${i})" style="cursor:pointer">
+        <span class="lbl">Predicted arrival</span>
+        <span class="val" style="color:${etaColor};font-weight:700">${etaLine} ✏️</span>
+      </div>
+      <div class="row"><span class="lbl" style="font-size:9px;color:var(--muted)">Based on</span><span class="val" style="font-size:9px;color:var(--muted)">${eta.hasOverride?"your logged ETA (Pace tab)":`${goalLabel} goal pace`}</span></div>
+      ${eta.behindCutoff?`<div class="row"><span class="lbl" style="color:var(--red)">⚠️ Cutoff risk</span><span class="val" style="color:var(--red);font-weight:700">${fmtBuffer(eta.cutoffBuffer)}</span></div>`:""}
       <div class="row"><span class="lbl">Crew</span><span class="val" style="color:${s.crew?"var(--green)":"var(--muted)"}">${s.crew===true?"✓ Yes":s.crew===false?"✗ No":s.crew}</span></div>
       <div class="row"><span class="lbl">Drop bag</span><span class="val" style="color:${s.bag?"var(--blue)":"var(--muted)"}">${s.bag?"✓ Yes":"✗ No"}</span></div>
       <div class="row"><span class="lbl">Pacer</span><span class="val" style="color:${s.pacer?"var(--teal)":"var(--muted)"}">${s.pacer===true?"✓ Yes":s.pacer===false?"✗ No":s.pacer}</span></div>
@@ -1540,7 +1554,7 @@ function renderAid(){
         <div class="as-body">
           <div class="name">${s.name}</div>
           ${s.sub?`<div class="sub" style="color:${subCol}">${s.sub}</div>`:""}
-          <div class="cutoff">Cutoff: <span style="color:var(--amber);font-weight:600">${s.cutoff}</span> · ${s.clock}</div>
+          <div class="cutoff">Cutoff: <span style="color:var(--amber);font-weight:600">${s.cutoff}</span> · ETA <span style="color:${etaColor};font-weight:700">${etaLine}</span></div>
         </div>
         <div class="as-badges">${badges}<span style="color:var(--muted);font-size:14px;margin-top:2px">${isOpen?"▲":"▼"}</span></div>
       </div>
