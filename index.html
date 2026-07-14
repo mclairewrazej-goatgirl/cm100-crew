@@ -213,7 +213,7 @@ const STATIONS = [
    logistics:"⚠️ Crew/pacer must park and hike 0.7mi in to aid station. Most runners arrive predawn/dark. Approach above treeline: boulder fields, cairns past small pond (don't fall in!), CAIRN navigation to Sunlight Lake area, trail turns sharply RIGHT before the lake to ascend the mountain. Loose dirt/rock ascent to saddle. Ridgeline trail (tundra + rocks) — large cairns mark course. Windy: stay slightly right of trail in spots where it's close to the edge. ⚠️ CRUCIAL DESCENT — most technical section of the course. DO NOT RUN. Extremely steep, exposed, loose rock and sand. Sit-scoot the worst section (~10 yards dropping 10-15ft then sidhilling a chute). Poles can be lost down chute — do not retrieve. Yell ROCK if you dislodge anything. Once through: trail widens, dinner-plate rocks, then quad-pounding descent to treeline and pleasantly runnable. Fork: stay left on trail 260, then stay right — marked junction. Cross creek to aid station. Leaving Sunlight: ½mi back up trail, LEFT at junction, RIGHT onto flagged singletrack. Down into Deep Creek crossing (WET — you'll understand why it's called that). Winds through trees, opens to old wide trail/road. Reaches Shields River Loop Rd — left out of parking lot, road down to shortcut through private land (cow trail, hard to see at first). Returns to Shields River Rd — right down toward Crandall.",
    food:"Night food. Hot soup/ramen if crew has thermos. Caffeine gel. Ginger chews proactively.",gear:"Fresh socks — feet will be wet from crossings. Warm layer check. Headlamp battery good for predawn miles?"},
   {name:"Crandall",sub:"★ KEY CREW STOP",mile:70.4,delta:7.1,bag:true,crew:true,pacer:true,cutoff:"7:45 AM Sat",clock:"~3:00 AM",type:"crew",
-   logistics:"Via Shields River Loop Rd. Dawn arrival likely. Leaving toward Forest Lake: back out gate, left, left at parking lot along two-track dirt road, drop to creek (usually crossable dry), up left through grassy field to lone tree → fenceline gate (cross the steps). Two-track dirt through horse pasture on private property. Up the draw on 4WD 'road' (grassy, sometimes just a track). Top of long climb → obvious 2-track, veer up-left at big fence pole. Left turn up the mountain — cow trail to salt lick area (~7,500ft), heavily marked. Over the hill, native grass — watch reflective tags. Suddenly: well-cut trail down through trees appears out of nowhere. Down to Eagle Creek — cross it MANY times. Gravel road left to Forest Lake. ⚠️ Cannot crew both Crandall AND Forest Lake (2.5h drive). Choose one.",
+   logistics:"Via Shields River Loop Rd. Dawn arrival likely. Leaving toward Forest Lake: back out gate, left, left at parking lot along two-track dirt road, drop to creek (usually crossable dry), up left through grassy field to lone tree → fenceline gate (cross the steps). Two-track dirt through horse pasture on private property. Up the draw on 4WD 'road' (grassy, sometimes just a track). Top of long climb → obvious 2-track, veer up-left at big fence pole. Left turn up the mountain — cow trail to salt lick area (~7,500ft), heavily marked. Over the hill, native grass — watch reflective tags. Suddenly: well-cut trail down through trees appears out of nowhere. Down to Eagle Creek — cross it MANY times. Gravel road left to Forest Lake. ⚠️ Cannot crew both Crandall AND Forest Lake (2.5h drive). Fallback crew stop only if Forest Lake's 4WD access isn't possible — a pacer picked up here runs to the finish.",
    food:"Dawn food. Real calories. Coffee. Runner has been out ~21 hrs.",gear:"Shoe/sock change? Blister recheck. Sunrise layer swap — day warming up."},
   {name:"Forest Lake",sub:"★ LAST CREW POINT · 4WD road",mile:78.3,delta:7.9,bag:true,crew:"4WD",pacer:true,cutoff:"10:15 AM Sat",clock:"~5:30 AM",type:"crew",priority:true,
    logistics:"⚠️ Rough 4WD road to reach. LAST crew before finish — NO crew at Huntin Camp in 2026. Pacers joining here MUST run to finish. Leaving: loop around, stay left toward where you came up, hit main road then GO STRAIGHT off the road onto narrow singletrack dropping toward lake. Left onto narrow ATV road along lake (tree cover, good footing). Left through meadow, back up to road. Right up along trail 635 (hard to see at start). Up through trees to junction 642 → left. Large downfall area with bare trees and cut logs — follow flagging. LEFT turn in inconspicuous spot, heavily marked. Out of treeline into meadow. ¼-mile hand-cut trail (new 2025) to ridgeline. 1.5mi ridge run — meadow left, treeline right. Drop left off ridge onto trail that appears suddenly. Trail disappears often — ⚠️ GPX essential. Out into tall grass meadow, odd sign in tree, flags in grass (hard to see — markers on ground and in trees). Basically straight up mountain on old two-track very hard to see. Veer left into Honey Trail aid.",
@@ -401,13 +401,13 @@ let STATE = {
       {leg:"Ibex → Halfmoon",       time:"~1.5 hrs",    note:"Rough forest service roads.",                            warn:false},
       {leg:"Halfmoon → Sunlight",   time:"~45 min",     note:"HIKE-IN 0.7mi. Arrive early — pacer swap point.",       warn:true},
       {leg:"Sunlight → Crandall",   time:"~45–60 min",  note:"⚠️ Cannot crew both easily. Choose one.",               warn:true},
-      {leg:"Crandall → Forest Lake",time:"~2.5 hrs",    note:"⚠️ Rough 4WD road. Cannot crew both. Choose one.",      warn:true},
+      {leg:"Crandall → Forest Lake",time:"~2.5 hrs",    note:"⚠️ Rough 4WD road. Cannot crew both — priority is Forest Lake, fall back to Crandall if 4WD access isn't possible.",      warn:true},
       {leg:"Forest Lake → Finish",  time:"Drive ahead", note:"⛔ NO crew at Huntin Camp. Next = FINISH.",              warn:true},
     ],
     decisions: [
       {title:"Sunlight vs Crandall",     body:"Cannot easily crew both. Crandall = easier access. Sunlight = hike-in but good pacer swap point."},
-      {title:"Crandall vs Forest Lake",  body:"~2.5h drive apart on rough roads. Forest Lake (mi 78.3) is last crew before finish."},
-      {title:"Pacer rules",              body:"Pacers join at Halfmoon (mi 43.4) or later. Starting at Forest Lake or before = must run to finish. No muling. Sign waiver online pre-race."},
+      {title:"Crandall vs Forest Lake",  body:"~2.5h drive apart on rough roads — crew realistically makes ONE, not both. Priority: Forest Lake (mi 78.3, 4WD access) since it's the last crew before finish. Fallback: Crandall (mi 70.4) if 4WD access isn't possible."},
+      {title:"Pacer rules",              body:"Pacers join at Halfmoon (mi 43.4) or later. Whichever of Crandall or Forest Lake ends up staffed is the last pacer swap — a pacer picked up there must run all the way to finish. No pacer pickup/dropoff pairing spans both, since crew won't be at both. No muling. Sign waiver online pre-race."},
     ],
     raceInfo: [
       {label:"Race date",     value:"Fri Jul 24, 2026 · 6:00 AM"},
@@ -1594,7 +1594,7 @@ function renderAid(){
   const goalM = Math.round((STATE.pace.goalHours - goalH) * 60);
   const goalLabel = goalM > 0 ? `${goalH}h ${goalM}m` : `${goalH}h`;
 
-  let html = `<div class="warn-banner">⚠️ 2026: No crew at Huntin Camp · Pacers from Forest Lake must finish · Conical Pass cutoff → 12:15 AM</div>`;
+  let html = `<div class="warn-banner">⚠️ 2026: No crew at Huntin Camp · Crew makes ONE of Crandall/Forest Lake, not both — pacers picked up at either must finish · Conical Pass cutoff → 12:15 AM</div>`;
 
   STATIONS.forEach((s,i)=>{
     const typeClass = s.type==="warn"?"warn":s.type==="crew"?"crew":"remote";
@@ -1795,6 +1795,8 @@ function pacerPickupStations(){
 function renderPacingScenarios(){
   const pickups = pacerPickupStations();
   const finishIdx = STATIONS.length - 1;
+  const crandallIdx = STATIONS.findIndex(x=>x.name==="Crandall");
+  const forestLakeIdx = STATIONS.findIndex(x=>x.name==="Forest Lake");
   const etas = computeETAs();
   const goalH = Math.floor(STATE.pace.goalHours);
   const goalM = Math.round((STATE.pace.goalHours - goalH) * 60);
@@ -1803,7 +1805,11 @@ function renderPacingScenarios(){
   const cards = pickups.map(({s:fromS, i:fromIdx}, pi)=>{
     // Valid dropoffs: any later pacer-eligible station, plus Finish.
     const laterPickups = pickups.slice(pi+1).map(p=>p.i);
-    const dropoffs = [...laterPickups, finishIdx].filter((v,idx,arr)=>arr.indexOf(v)===idx);
+    let dropoffs = [...laterPickups, finishIdx].filter((v,idx,arr)=>arr.indexOf(v)===idx);
+    // Crew can realistically staff Crandall OR Forest Lake, never both (too little time, too much driving
+    // between them) — so a pacer picked up at Crandall can't count on a swap at Forest Lake. Only Finish is valid.
+    if(fromIdx === crandallIdx) dropoffs = dropoffs.filter(toIdx=>toIdx !== forestLakeIdx);
+    const mustFinish = fromIdx === crandallIdx || fromIdx === forestLakeIdx;
 
     const rows = dropoffs.map(toIdx=>{
       const toS = STATIONS[toIdx];
@@ -1811,7 +1817,6 @@ function renderPacingScenarios(){
       const legs = toIdx - fromIdx;
       const durMin = etas[toIdx].minFromStart - etas[fromIdx].minFromStart;
       const elev = sumLegElev(fromIdx, toIdx);
-      const mustFinish = fromIdx === STATIONS.findIndex(x=>x.name==="Forest Lake");
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #fff1">
         <div style="flex:1;min-width:0">
           <div style="font-size:12px;font-weight:700">→ ${toS.name}${toIdx===finishIdx?" 🏁":""}</div>
@@ -1835,7 +1840,7 @@ function renderPacingScenarios(){
 
   return `
     <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-bottom:10px">
-      Pacers can join at Halfmoon or later. Pick a single-leg hop or cover several legs back to back — options below are pickup → dropoff at ${goalLabel} goal pace. Sunlight is a 0.7mi hike-in from parking. Forest Lake is the last pacer swap (no crew at Huntin Camp) — anyone picked up there runs all the way to the finish.
+      Pacers can join at Halfmoon or later. Pick a single-leg hop or cover several legs back to back — options below are pickup → dropoff at ${goalLabel} goal pace. Sunlight is a 0.7mi hike-in from parking. Crew will only make ONE of Crandall / Forest Lake (too tight a window, too much driving to do both) — priority is Forest Lake (4WD access), falling back to Crandall if that's not possible. Whichever one ends up staffed is the last pacer swap: anyone picked up at Crandall or Forest Lake runs all the way to the finish (no crew at Huntin Camp).
     </div>
     ${cards}`;
 }
