@@ -56,9 +56,12 @@
   .card.warn{background:var(--warn);border-color:var(--red)}
   .card.priority{background:#1E3A5Fcc;border-color:var(--teal)}
   /* ROWS */
-  .row{display:flex;justify-content:space-between;align-items:flex-start;padding:5px 12px;border-bottom:1px solid #fff1;font-size:11px}
-  .row .lbl{color:var(--muted);flex-shrink:0;padding-right:8px}
-  .row .val{color:var(--text);font-weight:600;text-align:right}
+  .row{display:flex;justify-content:space-between;align-items:flex-start;padding:5px 12px;border-bottom:1px solid #fff1;font-size:11px;gap:10px}
+  .row .lbl{color:var(--muted);flex-shrink:0;padding-right:8px;overflow-wrap:anywhere}
+  .row .val{color:var(--text);font-weight:600;text-align:right;min-width:0;overflow-wrap:anywhere}
+  .row.link{flex-direction:column;align-items:flex-start;gap:3px}
+  .row.link .val{text-align:left;width:100%}
+  .row.link .val a{display:inline-block}
   /* SECTION HEAD */
   .sh{margin:18px 0 8px;padding:6px 12px;border-left:3px solid var(--teal);background:#2DD4BF18;border-radius:0 6px 6px 0;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--teal);text-transform:uppercase}
   .sh.amber{border-color:var(--amber);background:#F59E0B18;color:var(--amber)}
@@ -456,6 +459,12 @@ function fmtDist(miles){
 function fmtVert(feet){
   if(useMetric){ return `${Math.round(feet * FT_TO_M).toLocaleString()}m`; }
   return `${feet.toLocaleString()}ft`;
+}
+
+// Long URL → short "hostname ↗" label for display, keeping the full URL as the href
+function linkLabel(url){
+  try{ return `${new URL(url).hostname.replace(/^www\./,"")} ↗`; }
+  catch(e){ return "Open link ↗"; }
 }
 
 // Pace: min/mile → formatted pace string
@@ -1839,7 +1848,10 @@ function renderCrew(){
   return `
     <div class="sh">Race Info</div>
     <div class="card">
-      ${raceInfo.map(({label,value})=>`<div class="row"><span class="lbl">${label}</span><span class="val">${/^https?:\/\//i.test(value)?`<a href="${value}" target="_blank" rel="noopener" style="color:var(--teal)">${value}</a>`:value}</span></div>`).join("")}
+      ${raceInfo.map(({label,value})=>{
+        const isLink = /^https?:\/\//i.test(value);
+        return `<div class="row${isLink?" link":""}"><span class="lbl">${label}</span><span class="val">${isLink?`<a href="${value}" target="_blank" rel="noopener" style="color:var(--teal)">${linkLabel(value)}</a>`:value}</span></div>`;
+      }).join("")}
       <div class="row"><span class="lbl">Cutoff pace</span><span class="val">~${fmtPace(21.6)} average</span></div>
     </div>
     <div class="sh">🏃 Pacing Options</div>
