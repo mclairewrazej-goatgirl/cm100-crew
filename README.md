@@ -21,7 +21,7 @@ Mobile-first race day planning and live tracking app for the **Crazy Mountain 10
 
 1. Go to **gist.github.com** (log in with your GitHub account)
 2. Set filename to exactly: `cm100_plan.json`
-3. Paste as content: `{"nutDB":[],"plan":{},"strategy":{},"pace":{},"gearSections":[],"legNotes":{},"stationNotes":{},"crewInfo":{}}`
+3. Paste as content: `{"nutDB":[],"plan":{},"strategy":{},"pace":{},"gearSections":[],"legNotes":{},"stationNotes":{},"crewInfo":{},"legElev":{}}`
 4. Click **Create secret gist**
 5. Copy the Gist ID from the URL (the long hash at the end)
 
