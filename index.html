@@ -1129,15 +1129,15 @@ function renderPace(){
       <div style="flex:1">
         <label>Goal finish time</label>
         <div style="display:flex;align-items:center;gap:6px">
-          <input type="number" id="goal-h" value="${goalH}" min="18" max="36" style="width:64px;text-align:center;font-size:16px;font-weight:800;color:var(--teal)" oninput="updateGoalTime()">
+          <input type="number" id="goal-h" value="${goalH}" min="18" max="36" style="width:64px;text-align:center;font-size:16px;font-weight:800;color:var(--teal)" onchange="updateGoalTime()">
           <span style="color:var(--muted);font-size:13px">h</span>
-          <input type="number" id="goal-m" value="${goalM}" min="0" max="59" step="5" style="width:64px;text-align:center;font-size:16px;font-weight:800;color:var(--teal)" oninput="updateGoalTime()">
+          <input type="number" id="goal-m" value="${goalM}" min="0" max="59" step="5" style="width:64px;text-align:center;font-size:16px;font-weight:800;color:var(--teal)" onchange="updateGoalTime()">
           <span style="color:var(--muted);font-size:13px">m</span>
         </div>
       </div>
       <div style="flex:1">
         <label>Race start</label>
-        <input type="time" id="start-time" value="${p.startTime||"06:00"}" oninput="updateStartTime(this.value)" style="font-size:14px;font-weight:700;color:var(--text)">
+        <input type="time" id="start-time" value="${p.startTime||"06:00"}" onchange="updateStartTime(this.value)" style="font-size:14px;font-weight:700;color:var(--text)">
       </div>
     </div>
     <div style="font-size:11px;color:var(--muted)">
