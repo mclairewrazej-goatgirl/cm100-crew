@@ -259,6 +259,28 @@ const LEGS = STATIONS.slice(0,-1).map((s,i)=>({
   ][i]||[]
 }));
 
+// Elevation gain/loss per leg (ft), derived from the runner's CalTopo course
+// profile (99.56mi, min 5,154' / max 10,005', course totals +21,120' / -21,778').
+// The source split table samples at 1km resolution, which undercounts true
+// gain/loss (small rollers within a km net out to ~0); each leg below is
+// scaled proportionally so the 12 legs sum to CalTopo's verified totals.
+// Editable per-leg from the Admin tab if better data (GPS watch actuals, a
+// finer-resolution profile) becomes available later.
+const DEFAULT_LEG_ELEV = [
+  {gain:1663, loss:293},   // 0: Start → Porcupine
+  {gain:1869, loss:2263},  // 1: Porcupine → Ibex
+  {gain:3356, loss:2748},  // 2: Ibex → Cow Camp
+  {gain:3186, loss:3970},  // 3: Cow Camp → Halfmoon
+  {gain:3739, loss:0},     // 4: Halfmoon → Conical Pass
+  {gain:107,  loss:3016},  // 5: Conical Pass → Cow Camp (return)
+  {gain:2695, loss:3079},  // 6: Cow Camp (return) → Sunlight
+  {gain:394,  loss:906},   // 7: Sunlight → Crandall
+  {gain:1368, loss:1034},  // 8: Crandall → Forest Lake
+  {gain:2069, loss:877},   // 9: Forest Lake → Honey Trail
+  {gain:674,  loss:2767},  // 10: Honey Trail → Huntin Camp
+  {gain:0,    loss:825},   // 11: Huntin Camp → Finish
+];
+
 const DEFAULT_DB = [
   {id:"gel-v",   name:"Gel – Vanilla",         cat:"Fuel",       cal:100,carbs:25,sodium:55, notes:"Maurten / SIS"},
   {id:"gel-caf", name:"Gel – Caffeine",         cat:"Fuel",       cal:100,carbs:25,sodium:55, notes:"100mg caffeine"},
@@ -346,7 +368,7 @@ let STATE = {
   // the timestamp comparison in loadFromGist().
   lastModified: {
     nutDB: 0, plan: 0, strategy: 0, pace: 0,
-    gearSections: 0, legNotes: 0, stationNotes: 0, crewInfo: 0,
+    gearSections: 0, legNotes: 0, stationNotes: 0, crewInfo: 0, legElev: 0,
   },
   nutDB: JSON.parse(JSON.stringify(DEFAULT_DB)),
   plan: {},
@@ -369,6 +391,7 @@ let STATE = {
   // Editable content — admin tab
   legNotes: {},        // {legIndex: {tags:[], courseNote:""}}
   stationNotes: {},    // {stationIndex: {logistics:"", food:"", gear:""}}
+  legElev: {},          // {legIndex: {gain: ft|null, loss: ft|null}} — entered via Admin, blank until real course data is available
   crewInfo: {
     driving: [
       {leg:"Start → Ibex",          time:"~1.5 hrs",    note:"Road accessible.",                                       warn:false},
@@ -455,6 +478,33 @@ function fmtMile(mile){
 }
 function unitLabel(){ return useMetric ? "km" : "mi"; }
 
+// Elevation gain/loss (ft) for a leg — Admin override if set, else the CalTopo-derived default.
+function legElevGain(i){
+  const o = STATE.legElev[i];
+  return (o && o.gain != null) ? o.gain : (DEFAULT_LEG_ELEV[i] ? DEFAULT_LEG_ELEV[i].gain : null);
+}
+function legElevLoss(i){
+  const o = STATE.legElev[i];
+  return (o && o.loss != null) ? o.loss : (DEFAULT_LEG_ELEV[i] ? DEFAULT_LEG_ELEV[i].loss : null);
+}
+// Compact "+1,234' / -567'" string (or per-unit if metric), "—" if unknown.
+function fmtGainLoss(gain, loss){
+  if(gain == null && loss == null) return "—";
+  const g = gain != null ? `+${fmtVert(gain)}` : "—";
+  const l = loss != null ? `-${fmtVert(loss)}` : "—";
+  return `${g} / ${l}`;
+}
+// Sum gain/loss across a range of legs [fromIdx, toIdx) — returns null if any leg is missing data.
+function sumLegElev(fromIdx, toIdx){
+  let gain = 0, loss = 0;
+  for(let i = fromIdx; i < toIdx; i++){
+    const g = legElevGain(i), l = legElevLoss(i);
+    if(g == null || l == null) return null;
+    gain += g; loss += l;
+  }
+  return {gain, loss};
+}
+
 // ═══════════════════════════════════════════════════════════
 // SYNC / GITHUB GIST
 // ═══════════════════════════════════════════════════════════
@@ -470,7 +520,7 @@ function gistHeaders(){
   };
 }
 
-const SYNCED_KEYS = ["nutDB","plan","strategy","pace","gearSections","legNotes","stationNotes","crewInfo"];
+const SYNCED_KEYS = ["nutDB","plan","strategy","pace","gearSections","legNotes","stationNotes","crewInfo","legElev"];
 
 // Treats empty/default values (the shape of a freshly-created, never-pushed
 // Gist) as "no real data" so they can't stomp real local data on merge.
@@ -715,6 +765,10 @@ function renderFuel(){
       <div class="leg-content">
         <div class="leg-name">${leg.from} → ${leg.to}</div>
         <div class="leg-tags">${tagHtml}</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">
+          <span style="color:var(--amber)">▲${legElevGain(i)!=null?fmtVert(legElevGain(i)):"—"}</span>
+          &nbsp;<span style="color:var(--blue)">▼${legElevLoss(i)!=null?fmtVert(legElevLoss(i)):"—"}</span>
+        </div>
         <div class="leg-items">${itemBadges}</div>
       </div>
       <div class="leg-cal">
@@ -723,6 +777,15 @@ function renderFuel(){
       </div>
     </div>`;
   });
+
+  const courseElev = sumLegElev(0, LEGS.length);
+  if(courseElev){
+    html += `<div class="card" style="padding:12px 14px;margin-top:8px;border-color:#60A5FA33">
+      <div style="font-size:11px;font-weight:800;color:var(--blue);margin-bottom:8px">COURSE ELEVATION</div>
+      <div class="row"><span class="lbl">Total gain</span><span class="val" style="color:var(--amber)">▲ ${fmtVert(courseElev.gain)}</span></div>
+      <div class="row"><span class="lbl">Total loss</span><span class="val" style="color:var(--blue)">▼ ${fmtVert(courseElev.loss)}</span></div>
+    </div>`;
+  }
 
   if(totalCal>0){
     html += `<div class="card" style="padding:12px 14px;margin-top:8px;border-color:#F59E0B33">
@@ -788,7 +851,11 @@ function renderLegModal(i){
       <button class="btn sm muted" onclick="closeModal()">← Back</button>
       <div>
         <div style="font-weight:800;font-size:13px">${leg.from} → ${leg.to}</div>
-        <div style="font-size:10px;color:var(--muted)">${fmtDist(leg.dist)}</div>
+        <div style="font-size:10px;color:var(--muted)">
+          ${fmtDist(leg.dist)}
+          &nbsp;·&nbsp;<span style="color:var(--amber)">▲${legElevGain(i)!=null?fmtVert(legElevGain(i)):"—"}</span>
+          &nbsp;<span style="color:var(--blue)">▼${legElevLoss(i)!=null?fmtVert(legElevLoss(i)):"—"}</span>
+        </div>
       </div>
     </div>
     <div class="terrain-box">
@@ -1136,6 +1203,7 @@ function renderPace(){
         <div style="flex:1;font-size:10px;color:${legColor}">
           ${LEGS[i-1].dist?`${fmtDist(LEGS[i-1].dist)} · `:""}Planned: ${fmtLegTime(plannedLegMins)}${actualLegMins!==null?` · Actual: ${fmtLegTime(actualLegMins)}`:""}
           ${legDiff!==null && Math.abs(legDiff)>=5?`<span style="font-weight:700"> (${legDiff>0?"+":""}${fmtLegTime(Math.abs(legDiff))} ${legDiff>0?"slow":"fast"})</span>`:""}
+          <span style="color:var(--muted)"> · ▲${legElevGain(i-1)!=null?fmtVert(legElevGain(i-1)):"—"} ▼${legElevLoss(i-1)!=null?fmtVert(legElevLoss(i-1)):"—"}</span>
         </div>
       </div>`;
     }
@@ -1535,8 +1603,13 @@ function renderAid(){
       s.bag?`${badge("BAG","#60A5FA")}`:"",
     ].filter(Boolean).join(" ");
 
+    const inLegIdx = i>0 ? i-1 : null;
+    const inGain = inLegIdx!=null ? legElevGain(inLegIdx) : null;
+    const inLoss = inLegIdx!=null ? legElevLoss(inLegIdx) : null;
+
     const detail = isOpen ? `<div class="as-detail">
       <div class="row"><span class="lbl">Leg gap</span><span class="val">${fmtDist(s.delta)}</span></div>
+      ${inLegIdx!=null?`<div class="row"><span class="lbl">Elevation this leg</span><span class="val">${fmtGainLoss(inGain,inLoss)}</span></div>`:""}
       <div class="row" onclick="event.stopPropagation(); openTimeEdit(${i})" style="cursor:pointer">
         <span class="lbl">Predicted arrival</span>
         <span class="val" style="color:${etaColor};font-weight:700">${etaLine} ✏️</span>
@@ -1705,6 +1778,59 @@ function resetGearToDefault(){
 // ═══════════════════════════════════════════════════════════
 // CREW LOGISTICS
 // ═══════════════════════════════════════════════════════════
+// Stations where a pacer can join — excludes the Finish (that's an endpoint, not a pickup).
+function pacerPickupStations(){
+  return STATIONS.map((s,i)=>({s,i})).filter(({s})=>s.pacer && s.name!=="Finish");
+}
+
+function renderPacingScenarios(){
+  const pickups = pacerPickupStations();
+  const finishIdx = STATIONS.length - 1;
+  const etas = computeETAs();
+  const goalH = Math.floor(STATE.pace.goalHours);
+  const goalM = Math.round((STATE.pace.goalHours - goalH) * 60);
+  const goalLabel = goalM > 0 ? `${goalH}h ${goalM}m` : `${goalH}h`;
+
+  const cards = pickups.map(({s:fromS, i:fromIdx}, pi)=>{
+    // Valid dropoffs: any later pacer-eligible station, plus Finish.
+    const laterPickups = pickups.slice(pi+1).map(p=>p.i);
+    const dropoffs = [...laterPickups, finishIdx].filter((v,idx,arr)=>arr.indexOf(v)===idx);
+
+    const rows = dropoffs.map(toIdx=>{
+      const toS = STATIONS[toIdx];
+      const dist = Math.round((toS.mile - fromS.mile) * 10) / 10;
+      const legs = toIdx - fromIdx;
+      const durMin = etas[toIdx].minFromStart - etas[fromIdx].minFromStart;
+      const elev = sumLegElev(fromIdx, toIdx);
+      const mustFinish = fromIdx === STATIONS.findIndex(x=>x.name==="Forest Lake");
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #fff1">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:700">→ ${toS.name}${toIdx===finishIdx?" 🏁":""}</div>
+          <div style="font-size:9px;color:var(--muted)">${legs} leg${legs>1?"s":""}${mustFinish&&toIdx===finishIdx?` · <span style="color:var(--amber)">only option — must run to finish</span>`:""}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:12px;font-weight:800;color:var(--teal)">${fmtDist(dist)}</div>
+          <div style="font-size:9px;color:var(--muted)">~${fmtLegTime(durMin)} · ${elev?`▲${fmtVert(elev.gain)} ▼${fmtVert(elev.loss)}`:"—"}</div>
+        </div>
+      </div>`;
+    }).join("");
+
+    return `<div class="card" style="padding:10px 12px;margin-bottom:8px;border-color:#2DD4BF33">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+        <span style="font-weight:800;font-size:12px;color:var(--teal)">${fromS.name}</span>
+        <span style="font-size:9px;color:var(--muted)">mi ${fmtMile(fromS.mile)}${fromS.pacer==="†"?" · hike-in required":""}</span>
+      </div>
+      ${rows}
+    </div>`;
+  }).join("");
+
+  return `
+    <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-bottom:10px">
+      Pacers can join at Halfmoon or later. Pick a single-leg hop or cover several legs back to back — options below are pickup → dropoff at ${goalLabel} goal pace. Sunlight is a 0.7mi hike-in from parking. Forest Lake is the last pacer swap (no crew at Huntin Camp) — anyone picked up there runs all the way to the finish.
+    </div>
+    ${cards}`;
+}
+
 function renderCrew(){
   const ci = STATE.crewInfo;
   const driving = ci.driving || [];
@@ -1716,6 +1842,8 @@ function renderCrew(){
       ${raceInfo.map(({label,value})=>`<div class="row"><span class="lbl">${label}</span><span class="val">${/^https?:\/\//i.test(value)?`<a href="${value}" target="_blank" rel="noopener" style="color:var(--teal)">${value}</a>`:value}</span></div>`).join("")}
       <div class="row"><span class="lbl">Cutoff pace</span><span class="val">~${fmtPace(21.6)} average</span></div>
     </div>
+    <div class="sh">🏃 Pacing Options</div>
+    ${renderPacingScenarios()}
     <div class="sh amber">Crew Driving Guide</div>
     ${driving.map(l=>`<div class="card ${l.warn?"warn":""}" style="padding:9px 12px;margin-bottom:6px">
       <div style="display:flex;justify-content:space-between;margin-bottom:3px">
@@ -1738,6 +1866,7 @@ function renderCrew(){
 function renderAdmin(){
   const sections = [
     {id:"legs",    label:"⛽ Fuel Plan — Leg Notes",    desc:"Edit terrain tags and course notes shown on each leg in the Fuel Plan tab."},
+    {id:"elev",    label:"⛰️ Leg Elevation",             desc:"Edit elevation gain/loss (ft) per leg, shown across Fuel, Aid Stations, Pace, and Crew tabs."},
     {id:"stations",label:"📍 Aid Station Notes",         desc:"Edit the logistics, food needs, and gear/action notes shown when a station is expanded."},
     {id:"driving", label:"🚗 Crew Driving Guide",         desc:"Edit the driving legs shown in the Crew tab."},
     {id:"decisions",label:"🔑 Key Crew Decisions",        desc:"Edit the key decision callouts in the Crew tab."},
@@ -1752,6 +1881,7 @@ function renderAdmin(){
       let body = "";
       if(isOpen){
         if(sec.id==="legs")     body = renderAdminLegs();
+        if(sec.id==="elev")     body = renderAdminElev();
         if(sec.id==="stations") body = renderAdminStations();
         if(sec.id==="driving")  body = renderAdminDriving();
         if(sec.id==="decisions")body = renderAdminDecisions();
@@ -1812,6 +1942,54 @@ function saveLegNote(i){
 function resetLegNote(i){
   if(!confirm("Reset this leg to default notes?")) return;
   mutate(()=>{ delete STATE.legNotes[i]; }, "legNotes");
+  toast("Reset to default");
+  renderTab("admin");
+}
+
+// ── LEG ELEVATION ────────────────────────────────────────────────────────────
+function renderAdminElev(){
+  const totalGain = LEGS.reduce((s,_,i)=>s+(legElevGain(i)||0),0);
+  const totalLoss = LEGS.reduce((s,_,i)=>s+(legElevLoss(i)||0),0);
+  return `
+    <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-bottom:10px">
+      Defaults are derived from a CalTopo course profile, scaled to match its reported totals (+21,120' / -21,778'). Currently totals <strong style="color:var(--text)">+${totalGain.toLocaleString()}' / -${totalLoss.toLocaleString()}'</strong>. Overwrite a leg below if you get more precise data (GPS watch actuals, a finer-resolution profile).
+    </div>
+    ${LEGS.map((leg,i)=>{
+      const hasOverride = STATE.legElev[i] !== undefined;
+      const gain = legElevGain(i), loss = legElevLoss(i);
+      return `<div style="background:var(--card);border-radius:8px;padding:11px 13px;margin-bottom:8px;border:1px solid ${hasOverride?"var(--teal)44":"#fff1"}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div>
+            <div style="font-size:12px;font-weight:700">${leg.from} → ${leg.to}</div>
+            <div style="font-size:10px;color:var(--muted)">${fmtDist(leg.dist)}</div>
+          </div>
+          ${hasOverride?`<button class="btn sm muted" onclick="resetLegElev(${i})">↺ Reset</button>`:""}
+        </div>
+        <div class="g2">
+          <div class="field" style="margin-bottom:0"><label>Gain (ft)</label><input type="number" id="elev-gain-${i}" value="${gain!=null?gain:""}" placeholder="unknown"></div>
+          <div class="field" style="margin-bottom:0"><label>Loss (ft)</label><input type="number" id="elev-loss-${i}" value="${loss!=null?loss:""}" placeholder="unknown"></div>
+        </div>
+        <button class="btn sm green" style="margin-top:8px" onclick="saveLegElev(${i})">Save leg ${i+1}</button>
+      </div>`;
+    }).join("")}`;
+}
+
+function saveLegElev(i){
+  const gRaw = document.getElementById(`elev-gain-${i}`).value;
+  const lRaw = document.getElementById(`elev-loss-${i}`).value;
+  mutate(()=>{
+    STATE.legElev[i] = {
+      gain: gRaw==="" ? null : Number(gRaw),
+      loss: lRaw==="" ? null : Number(lRaw),
+    };
+  }, "legElev");
+  toast("Elevation saved");
+  renderTab("admin");
+}
+
+function resetLegElev(i){
+  if(!confirm("Reset this leg to the default elevation figures?")) return;
+  mutate(()=>{ delete STATE.legElev[i]; }, "legElev");
   toast("Reset to default");
   renderTab("admin");
 }
@@ -2006,7 +2184,7 @@ function renderSettings(){
       ${[
         [`Go to <strong style="color:var(--teal)">gist.github.com</strong>`, "You'll need to be logged in to your GitHub account."],
         [`Set filename to exactly: <code style="background:#0a1520;color:var(--teal);padding:2px 6px;border-radius:3px">cm100_plan.json</code>`, "The filename must match exactly — the app looks for this specific file."],
-        [`Paste this as the content:`, `<div style="background:#0a1520;border:1px solid var(--teal)44;border-radius:6px;padding:8px 10px;margin-top:6px;font-family:monospace;font-size:10px;color:var(--teal);word-break:break-all">{"nutDB":[],"plan":{},"strategy":{},"pace":{},"gearSections":[],"legNotes":{},"stationNotes":{},"crewInfo":{}}</div>`],
+        [`Paste this as the content:`, `<div style="background:#0a1520;border:1px solid var(--teal)44;border-radius:6px;padding:8px 10px;margin-top:6px;font-family:monospace;font-size:10px;color:var(--teal);word-break:break-all">{"nutDB":[],"plan":{},"strategy":{},"pace":{},"gearSections":[],"legNotes":{},"stationNotes":{},"crewInfo":{},"legElev":{}}</div>`],
         [`Click <strong>Create secret gist</strong>`, "Secret means it won't show up in search results, but anyone with the ID can read it."],
         [`Copy the Gist ID from the URL`, `The URL looks like <code style="background:#0a1520;color:var(--teal);padding:1px 5px;border-radius:3px">gist.github.com/username/abc123def456</code> — the ID is the last part.`],
       ].map(([step,detail],i)=>`
