@@ -36,11 +36,20 @@ Mobile-first race day planning and live tracking app for the **Crazy Mountain 10
 
 Open the app → **⚙️ Sync** tab → paste Gist ID and token → **Save & Connect**
 
-### 4. Share with crew
+### 4. Share with crew (edit access)
 
 - Send crew the GitHub Pages URL
 - For the token: create a second token with gist scope, or share the same one (it only has gist access)
-- Each crew member enters the same Gist ID + token in their ⚙️ Sync tab
+- Each crew member enters the same Gist ID + token in their ⚙️ Sync tab — they can add/edit fuel, notes, gear, etc.
+
+### 5. Share with family (view only, no editing)
+
+GitHub only lets a Gist's *owner* write to it — no token scope grants edit access to someone else's Gist. So the real way to give someone view-only access is to give them a token that isn't yours:
+
+1. They create their own free GitHub account (if they don't have one)
+2. They generate their own token the same way as Step 2 (classic token, `gist` scope only)
+3. Give them the same Gist ID + **their own** token — reading works, but any edit attempt is rejected by GitHub since they don't own the Gist
+4. In the app's ⚙️ Sync tab, check **"This device is view-only"** on their behalf — this just hides the Add/Edit/Delete buttons on their screen so they never hit a confusing GitHub error. It's a UX nicety; step 3 is what actually enforces it.
 
 ---
 
