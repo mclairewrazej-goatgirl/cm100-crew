@@ -197,43 +197,56 @@
 const STATIONS = [
   {name:"Start",sub:"Westling Ranch · Wilsall MT",mile:0,delta:"—",bag:true,crew:true,pacer:false,cutoff:"6:00 AM Fri",clock:"6:00 AM",type:"crew",
    logistics:"Race starts in a field alongside Waltons Rd, Wilsall MT, just south of Porcupine Rd. Through the gate → left onto Waltons Rd (maintained gravel) → right onto Porcupine Rd → continue straight as road turns to unmaintained forest road and climbs south toward Porcupine Forest Cabin. Drop bags due Thu 3–7 PM at Berg Ranch (finish).",
-   food:"Pre-race breakfast, coffee. Load vest and top off water.",gear:"Full gear check. GPX downloaded. Poles if using."},
+   food:"Pre-race breakfast, coffee. Load vest and top off water.",gear:"Full gear check. GPX downloaded. Poles if using.",
+   crewTips:"Parking fills up early — arrive well before the 6 AM gun. This is a send-off only stop; next chance to see your runner is Ibex (mile 19.4)."},
   {name:"Porcupine",mile:6.1,delta:6.1,bag:false,crew:false,pacer:false,cutoff:"—",clock:"~7:00 AM",type:"remote",
    logistics:"No crew. Continues on the new Porcupine-Ibex Trail — most runnable terrain on the course. Mixture of nice dirt, occasional downfall, rocks and roots. Side-hills the mountain with short high points. Several water crossings, most can be done dry but weather-dependent. ⚠️ REFILL WATER HERE — people run out before Ibex. Continuing: singletrack eventually ends at trailhead, turn right down forest road to Ibex Forest Cabin.",
-   food:"Gels. Top off water — mandatory refill point.",gear:"—"},
+   food:"Gels. Top off water — mandatory refill point.",gear:"—",
+   crewTips:"No crew access. Next crew point is Ibex (mile 19.4) — plan your drive and rest accordingly."},
   {name:"Ibex",mile:19.4,delta:13.3,bag:true,crew:true,pacer:false,cutoff:"1:00 PM Fri",clock:"~9:30 AM",type:"crew",
    logistics:"Ibex Forest Cabin. Crew accessible by road. Drop bag available. Leaving: up forest road, past trailhead parking → left onto trail 271 (bypasses road) → steep ascent on two-track → opens to unmaintained forest two-track → right through gate, runnable rutted descent → meets trail 268 (wide, pleasant, rolling) → cross Cottonwood Creek bridge → immediate LEFT onto trail 268 up Trespass Creek. Then: 2,700ft climb over 5 miles to pass above Campfire Lake. Many water crossings and filter spots at base of pass. Trail becomes rock/shale/exposed with switchbacks. ⚠️ ESSENTIAL RIGHT TURN at natural lookout onto trail 123 (left onto trail 195 = wrong side of valley, ends up back at Porcupine — do not go left). Over the pass: loose scree descent, technical switchbacks, trail hard to see → stay on flagging past Campfire Lake (goats common here). Cross lake outlet on floating logs/rocks, head north down canyon. Middle Fork Sweet Grass Creek crossing WILL get feet wet. Long trail down to Cow Camp — you'll hear it before you see it.",
-   food:"Real food transition starts. Potatoes, broth, banana. Fill water well — big climb ahead.",gear:"Sunscreen reapply. Blister check. Water filter accessible."},
+   food:"Real food transition starts. Potatoes, broth, banana. Fill water well — big climb ahead.",gear:"Sunscreen reapply. Blister check. Water filter accessible.",
+   crewTips:"Road-accessible parking near the cabin. Runner will be moving fast this early — have food/water staged and ready so the stop is quick."},
   {name:"Cow Camp",sub:"FILL ALL WATER — 11.5mi to Halfmoon",mile:31.9,delta:12.5,bag:false,crew:false,pacer:false,cutoff:"—",clock:"~12:45 PM",type:"remote",
    logistics:"Remote aid packed in by horse team — tell them how awesome they are! No drop allowed. On the way TO Halfmoon: stay on the SAME side of creek (do not cross). Head right through aid station and up trail 122 toward Conical Peak — second major climb. Singletrack along South Fork through trees, opens to grassy meadows with cairns. ⚠️ Look down AND ahead to stay on trail. 1 wet crossing ~1.8mi from CC guaranteed; others vary. Drainage narrows and steepens toward Glacier Lake — mostly exposed tundra. Trail hard to see — follow flagging closely. GPX essential. Cairn navigation to the pass — breathtaking views both directions. Over pass onto trail 119 toward Half-Moon canyon. Rocky/shale, switchbacks down to Twin Lakes (on right). Trail widens near Halfmoon trailhead → cross 2 bridges → right through parking lot to aid station.",
-   food:"⚠️ EAT BIG — next crew is Halfmoon (11.5mi). Potatoes, pizza, broth. Eat more than you think.",gear:"⚠️ FILL ALL WATER TO MAX CAPACITY. Filter ready. This is critical — long exposed climb with no reliable water."},
+   food:"⚠️ EAT BIG — next crew is Halfmoon (11.5mi). Potatoes, pizza, broth. Eat more than you think.",gear:"⚠️ FILL ALL WATER TO MAX CAPACITY. Filter ready. This is critical — long exposed climb with no reliable water.",
+   crewTips:"No crew access (remote aid, horse-packed — thank the horse team!). Runner passes through here twice, outbound and on the return — don't wait here, head straight to Halfmoon."},
   {name:"Halfmoon",sub:"★ FIRST PACER PICKUP",mile:43.4,delta:11.5,bag:true,crew:true,pacer:true,cutoff:"9:45 PM Fri",clock:"~4:30 PM",type:"crew",priority:true,
    logistics:"Arrive at trailhead, right through parking lot. ~1h49m drive from finish. First pacer pickup. Leaving (Halfmoon → Cow Camp return): retrace in reverse — Conical Pass viewed twice each direction (epic). Trail 119 back over pass, rocky/shale. Rocky trail with bridges back to Cow Camp.",
-   food:"Major crew stop. Hot food — this is the last easy crew access for a while. Ginger chews start now.",gear:"⚠️ NIGHT GEAR STARTS HERE. Headlamp + spare batteries. Warm jacket/puffy. Long sleeve baselayer. Gloves. Night miles incoming."},
+   food:"Major crew stop. Hot food — this is the last easy crew access for a while. Ginger chews start now.",gear:"⚠️ NIGHT GEAR STARTS HERE. Headlamp + spare batteries. Warm jacket/puffy. Long sleeve baselayer. Gloves. Night miles incoming.",
+   crewTips:"~1h49m drive from the finish — budget accordingly. First pacer pickup happens here if that's your plan. Last relaxed, easy-access crew stop for a while — take your time getting the runner set up right."},
   {name:"Conical Pass",sub:"Checkpoint only · cutoff tightened 2026",mile:50,delta:6.6,bag:false,crew:false,pacer:false,cutoff:"12:15 AM Sat",clock:"~7:30 PM",type:"warn",checkpointOnly:true,
    logistics:"No crew. High alpine checkpoint only. ⚠️ Cutoff TIGHTENED 30 min for 2026 (was 12:45 AM). Arguably most breathtaking section of the entire race — views both directions. Weather can turn fast at altitude.",
-   food:"Quick snack only. Gels or chews — don't linger.",gear:"Warm layer accessible. Windy and exposed at this elevation."},
+   food:"Quick snack only. Gels or chews — don't linger.",gear:"Warm layer accessible. Windy and exposed at this elevation.",
+   crewTips:"No crew access — high alpine checkpoint only. Cutoff tightened 30 min for 2026, so don't be surprised if your runner's ETA here shifts."},
   {name:"Cow Camp (return)",mile:54.8,delta:4.8,bag:false,crew:false,pacer:false,cutoff:"—",clock:"~9:00 PM",type:"remote",
    logistics:"Leaving Cow Camp heading to Sunlight: ⚠️ NOW cross the creek (feet WILL get wet) — opposite to the Halfmoon approach. Follow trail 122 heading NE. Trail can be wet and swampy. ⚠️ ESSENTIAL LEFT TURN at ~1mi up North Fork on trail 273 — easy to miss especially at night, watch for flagging. Nice singletrack with switchbacks, gradually climbing. Often hot and humid during day but most see this section in the evening/night. Lots of tree cover. Filter spots spread along course. Above treeline: trail becomes harder to see — ⚠️ GPX essential from here. It will be dark.",
-   food:"Broth. Real food if available. Eat now — long night section ahead.",gear:"Confirm headlamp is on and working."},
+   food:"Broth. Real food if available. Eat now — long night section ahead.",gear:"Confirm headlamp is on and working.",
+   crewTips:"No crew access. Runner heads into a long night section from here — Sunlight crew requires a 0.7mi hike-in, so plan your drive plus walk time."},
   {name:"Sunlight",sub:"★ HIKE-IN 0.7mi from parking",mile:63.3,delta:8.5,bag:true,crew:"†",pacer:"†",cutoff:"5:30 AM Sat",clock:"~12:30 AM",type:"crew",
    logistics:"⚠️ Crew/pacer must park and hike 0.7mi in to aid station. Most runners arrive predawn/dark. Approach above treeline: boulder fields, cairns past small pond (don't fall in!), CAIRN navigation to Sunlight Lake area, trail turns sharply RIGHT before the lake to ascend the mountain. Loose dirt/rock ascent to saddle. Ridgeline trail (tundra + rocks) — large cairns mark course. Windy: stay slightly right of trail in spots where it's close to the edge. ⚠️ CRUCIAL DESCENT — most technical section of the course. DO NOT RUN. Extremely steep, exposed, loose rock and sand. Sit-scoot the worst section (~10 yards dropping 10-15ft then sidhilling a chute). Poles can be lost down chute — do not retrieve. Yell ROCK if you dislodge anything. Once through: trail widens, dinner-plate rocks, then quad-pounding descent to treeline and pleasantly runnable. Fork: stay left on trail 260, then stay right — marked junction. Cross creek to aid station. Leaving Sunlight: ½mi back up trail, LEFT at junction, RIGHT onto flagged singletrack. Down into Deep Creek crossing (WET — you'll understand why it's called that). Winds through trees, opens to old wide trail/road. Reaches Shields River Loop Rd — left out of parking lot, road down to shortcut through private land (cow trail, hard to see at first). Returns to Shields River Rd — right down toward Crandall.",
-   food:"Night food. Hot soup/ramen if crew has thermos. Caffeine gel. Ginger chews proactively.",gear:"Fresh socks — feet will be wet from crossings. Warm layer check. Headlamp battery good for predawn miles?"},
+   food:"Night food. Hot soup/ramen if crew has thermos. Caffeine gel. Ginger chews proactively.",gear:"Fresh socks — feet will be wet from crossings. Warm layer check. Headlamp battery good for predawn miles?",
+   crewTips:"Park and hike 0.7mi in — budget 20-30 min each way, more in the dark. Bring your own headlamp. Most runners arrive predawn, so plan to be set up and waiting before you expect them."},
   {name:"Crandall",sub:"★ KEY CREW STOP",mile:70.4,delta:7.1,bag:true,crew:true,pacer:true,cutoff:"7:45 AM Sat",clock:"~3:00 AM",type:"crew",
    logistics:"Via Shields River Loop Rd. Dawn arrival likely. Leaving toward Forest Lake: back out gate, left, left at parking lot along two-track dirt road, drop to creek (usually crossable dry), up left through grassy field to lone tree → fenceline gate (cross the steps). Two-track dirt through horse pasture on private property. Up the draw on 4WD 'road' (grassy, sometimes just a track). Top of long climb → obvious 2-track, veer up-left at big fence pole. Left turn up the mountain — cow trail to salt lick area (~7,500ft), heavily marked. Over the hill, native grass — watch reflective tags. Suddenly: well-cut trail down through trees appears out of nowhere. Down to Eagle Creek — cross it MANY times. Gravel road left to Forest Lake. ⚠️ Cannot crew both Crandall AND Forest Lake (2.5h drive). Fallback crew stop only if Forest Lake's 4WD access isn't possible — a pacer picked up here runs to the finish.",
-   food:"Dawn food. Real calories. Coffee. Runner has been out ~21 hrs.",gear:"Shoe/sock change? Blister recheck. Sunrise layer swap — day warming up."},
+   food:"Dawn food. Real calories. Coffee. Runner has been out ~21 hrs.",gear:"Shoe/sock change? Blister recheck. Sunrise layer swap — day warming up.",
+   crewTips:"You likely can't crew both Crandall AND Forest Lake — they're 2.5h apart by road. Decide in advance which one you're staffing; Forest Lake is generally the priority since it's the last crew point before the finish."},
   {name:"Forest Lake",sub:"★ LAST CREW POINT · 4WD road",mile:78.3,delta:7.9,bag:true,crew:"4WD",pacer:true,cutoff:"10:15 AM Sat",clock:"~5:30 AM",type:"crew",priority:true,
    logistics:"⚠️ Rough 4WD road to reach. LAST crew before finish — NO crew at Huntin Camp in 2026. Pacers joining here MUST run to finish. Leaving: loop around, stay left toward where you came up, hit main road then GO STRAIGHT off the road onto narrow singletrack dropping toward lake. Left onto narrow ATV road along lake (tree cover, good footing). Left through meadow, back up to road. Right up along trail 635 (hard to see at start). Up through trees to junction 642 → left. Large downfall area with bare trees and cut logs — follow flagging. LEFT turn in inconspicuous spot, heavily marked. Out of treeline into meadow. ¼-mile hand-cut trail (new 2025) to ridgeline. 1.5mi ridge run — meadow left, treeline right. Drop left off ridge onto trail that appears suddenly. Trail disappears often — ⚠️ GPX essential. Out into tall grass meadow, odd sign in tree, flags in grass (hard to see — markers on ground and in trees). Basically straight up mountain on old two-track very hard to see. Veer left into Honey Trail aid.",
-   food:"Sunrise food. Eggs/bacon from crew thermos if possible. Coffee. This is the last crew food.",gear:"Last blister/tape check. Poles for final climbs? Last shoe change opportunity."},
+   food:"Sunrise food. Eggs/bacon from crew thermos if possible. Coffee. This is the last crew food.",gear:"Last blister/tape check. Poles for final climbs? Last shoe change opportunity.",
+   crewTips:"Rough 4WD road in — a high-clearance/4WD vehicle is recommended, and budget extra drive time. This is the LAST crew access before the finish (no crew at Huntin Camp), so make it count."},
   {name:"Honey Trail",mile:85.4,delta:7.1,bag:false,crew:false,pacer:false,cutoff:"—",clock:"~8:30 AM",type:"remote",
    logistics:"No crew. Fully exposed ridge. Often windy. Rocky rolling two-track. Seems like the top but continues a slight steady uphill. Views back to jagged peaks already conquered — dig deep. Stay left on trail 396. ⚠️ CRUCIAL RIGHT TURN at fork — stay on trail 396 (left = trail 9244, wrong direction; cows trample flags here so double-check). ~½mi past fork: treeline, water tank on right. ⚠️ Filter from PIPE into tank — do NOT drink directly from stock tank. Wide 2-track descent through trees, rocky, winds and turns — easy to follow. Eventually along creek. Meadowy two-track, easy downgrade. Gate (hop over or through depending on cows). Large creek crossing — feet WILL get wet. Huntin Camp aid station is right around the corner. Consider sitting in the creek if hot — dry clothes in drop bag right there.",
-   food:"Gels. Real food if any remains. 85 miles in — fuel what you can.",gear:"—"},
+   food:"Gels. Real food if any remains. 85 miles in — fuel what you can.",gear:"—",
+   crewTips:"No crew access. Next and final crew point is the finish — runner is on their own from here to the buckle."},
   {name:"Huntin Camp",sub:"⛔ NO CREW 2026 · Drop bag only",mile:92.8,delta:7.4,bag:true,crew:false,pacer:false,cutoff:"4:45 PM Sat",clock:"~11:45 AM",type:"warn",
    logistics:"⛔ NO CREW ACCESS 2026. Drop bag only. DNF here is final — no retrieval possible. Leaving (NEW 2026 route): up road briefly then down gravel/dirt road. Cattle guards — enjoy the ranchland. Turn right past cattle guard, run along the dam, right at end along north side of reservoir. Ranch two-track around the mountain (heavily marked but two-track not always obvious). More obvious road → gate → north. Wind around to the highway. Cross highway. Up driveway to Berg Ranch. Left through the unassuming archway. You can take the hug — they think you should!",
-   food:"Whatever is in drop bag. 7 miles to go. Eat and go.",gear:"—"},
+   food:"Whatever is in drop bag. 7 miles to go. Eat and go.",gear:"—",
+   crewTips:"⛔ No crew access in 2026 — drop bag only, and any DNF here is final. If you're not staffing Forest Lake, make sure the drop bag here is stocked — it's the last supplies your runner sees before the finish."},
   {name:"Finish",sub:"Berg Ranch · Martinsdale MT",mile:100,delta:7.2,bag:false,crew:true,pacer:true,cutoff:"6:00 PM Sat",clock:"~9:00 AM",type:"crew",
    logistics:"Berg Ranch, 41 Berg Rd, Martinsdale MT. Left through unassuming archway — optional finisher's hug (they think you should take it!). Custom buckle. Camping along creek. Awards + celebration 6:15 PM Sat.",
-   food:"🎉 FOOD & BEER — you earned it.",gear:"Dry clothes. Recovery shoes. Foam roller. Warm layer."},
+   food:"🎉 FOOD & BEER — you earned it.",gear:"Dry clothes. Recovery shoes. Foam roller. Warm layer.",
+   crewTips:"Custom buckle awaits! Camping available along the creek. Awards + celebration 6:15 PM Sat — plan to stick around and celebrate."},
 ];
 
 const LEGS = STATIONS.slice(0,-1).map((s,i)=>({
@@ -1889,12 +1902,13 @@ function renderAid(){
       </div>
       <div class="row"><span class="lbl" style="font-size:9px;color:var(--muted)">Based on</span><span class="val" style="font-size:9px;color:var(--muted)">${eta.hasOverride?"your logged ETA (Pace tab)":eta.shiftedByActual?"logged actual arrival + planned pace":`${goalLabel} goal pace`}</span></div>
       ${eta.behindCutoff?`<div class="row"><span class="lbl" style="color:var(--red)">⚠️ Cutoff risk</span><span class="val" style="color:var(--red);font-weight:700">${fmtBuffer(eta.cutoffBuffer)}</span></div>`:""}
-      <div class="row"><span class="lbl">Crew</span><span class="val" style="color:${s.crew?"var(--green)":"var(--muted)"}">${s.crew===true?"✓ Yes":s.crew===false?"✗ No":s.crew}</span></div>
+      <div class="row"><span class="lbl">Crew</span><span class="val" style="color:${s.crew?"var(--green)":"var(--muted)"}">${s.crew?"✓ Yes":"✗ No"}</span></div>
       <div class="row"><span class="lbl">Drop bag</span><span class="val" style="color:${s.bag?"var(--blue)":"var(--muted)"}">${s.bag?"✓ Yes":"✗ No"}</span></div>
-      <div class="row"><span class="lbl">Pacer</span><span class="val" style="color:${s.pacer?"var(--teal)":"var(--muted)"}">${s.pacer===true?"✓ Yes":s.pacer===false?"✗ No":s.pacer}</span></div>
+      <div class="row"><span class="lbl">Pacer</span><span class="val" style="color:${s.pacer?"var(--teal)":"var(--muted)"}">${s.pacer?"✓ Yes":"✗ No"}</span></div>
       <div class="as-section"><div class="lbl" style="color:var(--amber)">COURSE & LOGISTICS</div>${(STATE.stationNotes[i]||{}).logistics||s.logistics}</div>
       <div class="as-section"><div class="lbl" style="color:var(--green)">FOOD NEEDS</div>${(STATE.stationNotes[i]||{}).food||s.food}</div>
       <div class="as-section"><div class="lbl" style="color:var(--blue)">GEAR / ACTION</div>${(STATE.stationNotes[i]||{}).gear||s.gear}</div>
+      <div class="as-section"><div class="lbl" style="color:var(--purple)">CREW TIPS</div>${(STATE.stationNotes[i]||{}).crewTips||s.crewTips||"—"}</div>
     </div>` : "";
 
     html += `<div class="as-card card ${typeClass}" onclick="toggleSection('as-${i}')">
@@ -2328,6 +2342,7 @@ function renderAdminStations(){
     const logistics  = override.logistics  !== undefined ? override.logistics  : s.logistics;
     const food       = override.food       !== undefined ? override.food       : s.food;
     const gear       = override.gear       !== undefined ? override.gear       : s.gear;
+    const crewTips   = override.crewTips   !== undefined ? override.crewTips   : s.crewTips;
     return `<div style="background:var(--card);border-radius:8px;padding:11px 13px;margin-bottom:8px;border:1px solid ${hasOverride?"var(--teal)44":"#fff1"}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div>
@@ -2340,6 +2355,7 @@ function renderAdminStations(){
         ["stn-logistics-"+i,"COURSE & LOGISTICS","var(--amber)",logistics,4],
         ["stn-food-"+i,     "FOOD NEEDS",        "var(--green)", food,   2],
         ["stn-gear-"+i,     "GEAR / ACTION",     "var(--blue)",  gear,   2],
+        ["stn-crewtips-"+i, "CREW TIPS",         "var(--purple)",crewTips,2],
       ].map(([id,lbl,col,val,rows])=>`
         <div style="margin-bottom:8px">
           <div style="font-size:10px;color:${col};font-weight:700;margin-bottom:4px">${lbl}</div>
@@ -2356,6 +2372,7 @@ function saveStationNote(i){
       logistics: document.getElementById(`stn-logistics-${i}`).value.trim(),
       food:      document.getElementById(`stn-food-${i}`).value.trim(),
       gear:      document.getElementById(`stn-gear-${i}`).value.trim(),
+      crewTips:  document.getElementById(`stn-crewtips-${i}`).value.trim(),
     };
   }, "stationNotes");
   toast("Station note saved");
