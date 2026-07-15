@@ -671,6 +671,43 @@ function legTotals(i){
 function dbItem(id){ return STATE.nutDB.find(x=>x.id===id); }
 function uid(){ return "c"+ Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
 
+// Estimated time (minutes) to cover leg i, from the Pace tab's goal-time schedule
+function legDurationMin(i){
+  const etas = computeETAs();
+  return Math.max(0, etas[i+1].minFromStart - etas[i].minFromStart);
+}
+// Fuel needed for leg i, derived from Strategy's per-hour targets × estimated leg time
+function legTargets(i){
+  const s = STATE.strategy;
+  const hrs = legDurationMin(i) / 60;
+  return {
+    cal:    Math.round(s.calPerHr * hrs),
+    carbs:  Math.round(s.carbsPerHr * hrs),
+    sodium: Math.round(s.sodiumPerHr * hrs),
+    ml:     Math.round(s.waterPerHr * hrs),
+  };
+}
+// null = nothing to check against; true/false = whether planned items cover carbs+sodium targets
+function legMeetsTarget(tots, targets){
+  const checks = [];
+  if(targets.carbs>0)  checks.push(tots.carbs  >= targets.carbs);
+  if(targets.sodium>0) checks.push(tots.sodium >= targets.sodium);
+  return checks.length ? checks.every(Boolean) : null;
+}
+function progressBar(actual, target, col){
+  const pct = target>0 ? Math.min(100, Math.round(actual/target*100)) : 0;
+  const ok = pct>=80;
+  return `<div style="margin-top:4px">
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:3px">
+      <span>${actual.toLocaleString()} planned</span>
+      <span style="color:${ok?"var(--green)":"var(--amber)"}">${pct}% of target</span>
+    </div>
+    <div style="background:#fff1;border-radius:4px;height:6px;overflow:hidden">
+      <div style="background:${ok?"var(--green)":"var(--amber)"};width:${pct}%;height:100%;border-radius:4px;transition:width .3s"></div>
+    </div>
+  </div>`;
+}
+
 function badge(text, color){
   return `<span class="badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${text}</span>`;
 }
@@ -753,6 +790,9 @@ function renderFuel(){
   LEGS.forEach((leg,i)=>{
     const tots = legTotals(i);
     const items = legItems(i);
+    const durMin = legDurationMin(i);
+    const targets = legTargets(i);
+    const meets = legMeetsTarget(tots, targets);
     const typeClass = leg.toType==="warn"?"warn":leg.toType==="crew"?"crew":"remote";
     const toColor = leg.toType==="warn"?"var(--red)":leg.toType==="crew"?"var(--blue)":"var(--amber)";
 
@@ -791,11 +831,16 @@ function renderFuel(){
         <div style="font-size:9px;color:var(--muted);margin-top:2px">
           <span style="color:var(--amber)">▲${legElevGain(i)!=null?fmtVert(legElevGain(i)):"—"}</span>
           &nbsp;<span style="color:var(--blue)">▼${legElevLoss(i)!=null?fmtVert(legElevLoss(i)):"—"}</span>
+          ${durMin?`&nbsp;<span style="color:var(--teal)">~${fmtLegTime(durMin)}</span>`:""}
+        </div>
+        <div style="font-size:9px;color:var(--teal);margin-top:2px">
+          🎯 Need: ${targets.carbs}g carbs · ${targets.sodium.toLocaleString()}mg Na${targets.ml>0?` · ${(targets.ml/1000).toFixed(1)}L water`:""}
         </div>
         <div class="leg-items">${itemBadges}</div>
       </div>
       <div class="leg-cal">
         ${tots.cal>0?`<div class="cal">${tots.cal}</div><div class="lbl">cal</div>`:""}
+        ${meets!==null?`<div style="font-size:11px;font-weight:800;margin-top:4px;color:${meets?"var(--green)":"var(--amber)"}">${meets?"✓":"⚠"}</div>`:""}
         <div style="color:var(--muted);font-size:14px;margin-top:4px">›</div>
       </div>
     </div>`;
@@ -834,6 +879,8 @@ function renderLegModal(i){
   const items = legItems(i);
   const tots = legTotals(i);
   const toStn = STATIONS.find(s=>s.name===leg.to);
+  const durMin = legDurationMin(i);
+  const targets = legTargets(i);
 
   const totBar = tots.cal>0 ? `<div class="totals">
     ${[["cal",tots.cal,"var(--amber)"],["carbs",tots.carbs+"g","var(--green)"],["sodium",tots.sodium+"mg","var(--teal)"],
@@ -842,6 +889,29 @@ function renderLegModal(i){
       <div class="val" style="color:${col}">${v}</div><div class="lbl">${l}</div>
     </div>`).join("")}
   </div>` : "";
+
+  const targetBox = `<div class="card" style="padding:10px 12px;margin-bottom:10px;border-color:#2DD4BF33">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:10px;font-weight:800;color:var(--teal);letter-spacing:1px">FUEL NEEDED THIS LEG</div>
+      <div style="font-size:10px;color:var(--muted)">${durMin?`~${fmtLegTime(durMin)} est.`:"—"}</div>
+    </div>
+    <div style="margin-bottom:8px">
+      <div style="font-size:10px;color:var(--muted)">Carbs · target ${targets.carbs}g</div>
+      ${progressBar(tots.carbs, targets.carbs, "var(--green)")}
+    </div>
+    <div style="margin-bottom:8px">
+      <div style="font-size:10px;color:var(--muted)">Sodium · target ${targets.sodium.toLocaleString()}mg</div>
+      ${progressBar(tots.sodium, targets.sodium, "var(--teal)")}
+    </div>
+    <div style="margin-bottom:8px">
+      <div style="font-size:10px;color:var(--muted)">Calories · target ${targets.cal.toLocaleString()}</div>
+      ${progressBar(tots.cal, targets.cal, "var(--amber)")}
+    </div>
+    ${targets.ml>0?`<div>
+      <div style="font-size:10px;color:var(--muted)">Water · target ${targets.ml.toLocaleString()}mL</div>
+      ${progressBar(tots.ml, targets.ml, "var(--blue)")}
+    </div>`:""}
+  </div>`;
 
   const itemRows = items.map(({itemId,qty})=>{
     const it=dbItem(itemId); if(!it) return "";
@@ -889,6 +959,7 @@ function renderLegModal(i){
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${tagHtml}</div>
       <div style="font-size:10px;color:var(--dim);line-height:1.6">${toStn?toStn.logistics:""}</div>
     </div>
+    ${targetBox}
     ${totBar}
     ${itemRows||`<div style="text-align:center;padding:20px 0;color:var(--muted);font-size:12px">No fuel added yet</div>`}
     ${STATE.viewOnly?"":`<button class="btn" style="width:100%;margin-top:8px" onclick="openLegPicker(${i})">+ Add Food / Drink</button>`}
@@ -1535,19 +1606,7 @@ function renderStrategy(){
   const targetTotalNa    = s.sodiumPerHr * hrs;
   const targetWater      = s.waterPerHr * hrs;
 
-  function bar(actual, target, col){
-    const pct = target>0 ? Math.min(100, Math.round(actual/target*100)) : 0;
-    const ok = pct>=80;
-    return `<div style="margin-top:4px">
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:3px">
-        <span>${actual.toLocaleString()} planned</span>
-        <span style="color:${ok?"var(--green)":"var(--amber)"}">${pct}% of target</span>
-      </div>
-      <div style="background:#fff1;border-radius:4px;height:6px;overflow:hidden">
-        <div style="background:${ok?"var(--green)":"var(--amber)"};width:${pct}%;height:100%;border-radius:4px;transition:width .3s"></div>
-      </div>
-    </div>`;
-  }
+  const bar = progressBar;
 
   return `
     <div class="sh">Your Hourly Targets</div>
