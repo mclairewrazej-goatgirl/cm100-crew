@@ -2280,7 +2280,7 @@ function renderSettings(){
         <label style="margin:0;font-size:11px;color:var(--text);font-weight:400" for="view-only-input">This device is <strong>view-only</strong> — hide editing controls here</label>
       </div>
       <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
-        ⚠️ The token is stored only in your browser's local storage — it never leaves your device except to call the GitHub API. See <strong>Step 4</strong> below for how to give crew real read-only access.
+        ⚠️ The token is stored only in your browser's local storage — it never leaves your device except to call the GitHub API.
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn green" onclick="saveGistConfig()" style="flex:1;padding:10px">Save & Connect</button>
@@ -2289,34 +2289,17 @@ function renderSettings(){
     </div>
 
     <!-- STEP 4: SHARE WITH CREW -->
-    <div style="font-size:11px;font-weight:800;color:var(--purple);letter-spacing:1px;margin-bottom:6px">STEP 4 — SHARE WITH CREW (EDIT ACCESS)</div>
+    <div style="font-size:11px;font-weight:800;color:var(--purple);letter-spacing:1px;margin-bottom:6px">STEP 4 — SHARE WITH CREW & FAMILY</div>
     <div class="card" style="padding:14px;margin-bottom:12px">
       ${[
-        ["Share the app URL","Text crew: <code style='background:#0a1520;color:var(--purple);padding:1px 4px;border-radius:3px'>mclairewrazej-goatgirl.github.io/cm100-crew</code> — they open it in Safari or Chrome."],
-        ["Give them the Gist ID + your token","They go to ⚙️ Sync → paste the same Gist ID and the same token (it only has gist access). Anyone with this token can edit the plan."],
+        ["Share the app URL","Text everyone: <code style='background:#0a1520;color:var(--purple);padding:1px 4px;border-radius:3px'>mclairewrazej-goatgirl.github.io/cm100-crew</code> — they open it in Safari or Chrome."],
+        ["Give them the Gist ID + your token","They go to ⚙️ Sync → paste the same Gist ID and the same token as you. No GitHub account needed on their end."],
+        [`For view-only people, check <strong>“This device is view-only”</strong> above on their behalf`,"Hides the Add/Edit/Delete buttons on their device so they only see LOG buttons and read-only info — no accidental edits. It's a courtesy toggle, not a lock: the token itself can still write, so only hand it to people you trust not to poke around the raw API."],
         ["Add to home screen","iOS: Safari → Share → Add to Home Screen. Android: Chrome → menu → Add to Home Screen. Works offline from then on."],
         ["Designate one tracker","Whoever has the best signal at each aid station logs arrivals. Everyone else reads — plan is always cached offline."],
       ].map(([t,b],i)=>`
         <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start">
           <div style="background:var(--purple);color:#000;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex-shrink:0;margin-top:1px">${i+1}</div>
-          <div style="font-size:11px;line-height:1.6"><span style="color:var(--text);font-weight:700">${t}</span><br><span style="color:var(--muted)">${b}</span></div>
-        </div>`).join("")}
-    </div>
-
-    <!-- STEP 5: SHARE READ-ONLY -->
-    <div style="font-size:11px;font-weight:800;color:var(--blue);letter-spacing:1px;margin-bottom:6px">STEP 5 — SHARE WITH FAMILY (VIEW ONLY, NO EDITING)</div>
-    <div class="card" style="padding:14px;margin-bottom:12px">
-      <div style="font-size:11px;color:var(--dim);line-height:1.8;margin-bottom:10px">
-        Your token can edit the plan because it belongs to <strong style="color:var(--text)">your</strong> GitHub account, and GitHub only lets a Gist's owner write to it — no token scope grants edit access to someone else's Gist. So the real, GitHub-enforced way to give someone view-only access is: <strong style="color:var(--text)">give them a token that isn't yours.</strong>
-      </div>
-      ${[
-        ["They create their own free GitHub account","If they don't already have one — takes 2 minutes at github.com/signup. It does not need to be related to yours."],
-        [`They generate <strong>their own</strong> token`,"Same as Step 2, from <em>their</em> account: github.com/settings/tokens → Generate new token (classic) → check only <strong>gist</strong> scope."],
-        ["Give them the Gist ID + their own token","Same Gist ID as everyone else. They enter it with <strong>their</strong> token in ⚙️ Sync — reading works fine, but GitHub will reject any edit attempt (404/403) since they don't own the Gist."],
-        [`Check <strong>“This device is view-only”</strong> above on their behalf`,"This is a UX nicety, not the security boundary — it just hides the Add/Edit/Delete buttons on their device so they never see a confusing GitHub error. The real protection is Step 5.1–5.3 above."],
-      ].map(([t,b],i)=>`
-        <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start">
-          <div style="background:var(--blue);color:#000;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex-shrink:0;margin-top:1px">${i+1}</div>
           <div style="font-size:11px;line-height:1.6"><span style="color:var(--text);font-weight:700">${t}</span><br><span style="color:var(--muted)">${b}</span></div>
         </div>`).join("")}
     </div>
