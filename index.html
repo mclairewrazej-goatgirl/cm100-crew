@@ -310,28 +310,28 @@ const DEFAULT_LEG_ELEV = [
 ];
 
 const DEFAULT_DB = [
-  {id:"gel-v",   name:"Gel – Vanilla",         cat:"Fuel",       cal:100,carbs:25,sodium:55, notes:"Maurten / SIS"},
-  {id:"gel-caf", name:"Gel – Caffeine",         cat:"Fuel",       cal:100,carbs:25,sodium:55, notes:"100mg caffeine"},
-  {id:"chews",   name:"Chews (1 pack)",          cat:"Fuel",       cal:100,carbs:25,sodium:70, notes:"Clif Bloks or similar"},
-  {id:"coffee",  name:"Coffee (cup)",            cat:"Fuel",       cal:5,  carbs:0, sodium:5,  notes:"Crew/aid station"},
-  {id:"potato",  name:"Boiled Potato + Salt",    cat:"Real Food",  cal:80, carbs:18,sodium:300,notes:"Aid station staple"},
-  {id:"pbj",     name:"PB&J (half sandwich)",    cat:"Real Food",  cal:180,carbs:22,sodium:200,notes:"Crew / drop bag"},
-  {id:"ramen",   name:"Ramen / Noodle Soup",     cat:"Real Food",  cal:190,carbs:27,sodium:800,notes:"Crew thermos / aid station"},
-  {id:"rice",    name:"Rice Ball",               cat:"Real Food",  cal:120,carbs:26,sodium:150,notes:""},
-  {id:"broth",   name:"Broth (cup)",             cat:"Real Food",  cal:15, carbs:1, sodium:900,notes:"Aid station"},
-  {id:"coke",    name:"Coca-Cola (can)",          cat:"Real Food",  cal:150,carbs:39,sodium:45, notes:"Night miles – nausea reset"},
-  {id:"banana",  name:"Banana",                  cat:"Real Food",  cal:105,carbs:27,sodium:1,  notes:""},
-  {id:"pizza",   name:"Pizza (slice)",           cat:"Real Food",  cal:285,carbs:36,sodium:640,notes:"Cow Camp specialty!"},
-  {id:"eggs",    name:"Eggs & Bacon (serving)",  cat:"Real Food",  cal:280,carbs:1, sodium:600,notes:"Crew at Forest Lake / dawn"},
-  {id:"cheese",  name:"Grilled Cheese (half)",   cat:"Real Food",  cal:200,carbs:18,sodium:380,notes:"Crew favourite"},
-  {id:"ginger",  name:"Ginger Chew",             cat:"Supplement", cal:10, carbs:2, sodium:0,  notes:"Nausea prevention"},
-  {id:"salt",    name:"Salt Tab / Capsule",      cat:"Electrolyte",cal:0,  carbs:0, sodium:250,ml:0,  notes:"SaltStick or Precision"},
-  {id:"ph",      name:"PH Electrolyte Mix",      cat:"Electrolyte",cal:10, carbs:2, sodium:500,ml:500,notes:"Per serving, mixed in water"},
-  {id:"w500",    name:"Water (500ml)",            cat:"Hydration",  cal:0,  carbs:0, sodium:0,  ml:500,notes:""},
-  {id:"w750",    name:"Water (750ml)",            cat:"Hydration",  cal:0,  carbs:0, sodium:0,  ml:750,notes:""},
-  {id:"tailwind",name:"Tailwind (1 scoop)",       cat:"Hydration",  cal:100,carbs:25,sodium:310,ml:500,notes:"Per scoop in water"},
-  {id:"ibu",     name:"Ibuprofen (200mg)",        cat:"Medical",    cal:0,  carbs:0, sodium:0,  notes:"Use sparingly"},
-  {id:"antacid", name:"Antacid (Tums)",           cat:"Medical",    cal:0,  carbs:0, sodium:0,  notes:""},
+  {id:"gel-v",   name:"Gel – Vanilla",         cat:"Fuel",       cal:100,carbs:25,sodium:55, caf:0,  notes:"Maurten / SIS"},
+  {id:"gel-caf", name:"Gel – Caffeine",         cat:"Fuel",       cal:100,carbs:25,sodium:55, caf:100,notes:"100mg caffeine"},
+  {id:"chews",   name:"Chews (1 pack)",          cat:"Fuel",       cal:100,carbs:25,sodium:70, caf:0,  notes:"Clif Bloks or similar"},
+  {id:"coffee",  name:"Coffee (cup)",            cat:"Fuel",       cal:5,  carbs:0, sodium:5,  caf:95, notes:"Crew/aid station"},
+  {id:"potato",  name:"Boiled Potato + Salt",    cat:"Real Food",  cal:80, carbs:18,sodium:300,caf:0,  notes:"Aid station staple"},
+  {id:"pbj",     name:"PB&J (half sandwich)",    cat:"Real Food",  cal:180,carbs:22,sodium:200,caf:0,  notes:"Crew / drop bag"},
+  {id:"ramen",   name:"Ramen / Noodle Soup",     cat:"Real Food",  cal:190,carbs:27,sodium:800,caf:0,  notes:"Crew thermos / aid station"},
+  {id:"rice",    name:"Rice Ball",               cat:"Real Food",  cal:120,carbs:26,sodium:150,caf:0,  notes:""},
+  {id:"broth",   name:"Broth (cup)",             cat:"Real Food",  cal:15, carbs:1, sodium:900,caf:0,  notes:"Aid station"},
+  {id:"coke",    name:"Coca-Cola (can)",          cat:"Real Food",  cal:150,carbs:39,sodium:45, caf:34, notes:"Night miles – nausea reset"},
+  {id:"banana",  name:"Banana",                  cat:"Real Food",  cal:105,carbs:27,sodium:1,  caf:0,  notes:""},
+  {id:"pizza",   name:"Pizza (slice)",           cat:"Real Food",  cal:285,carbs:36,sodium:640,caf:0,  notes:"Cow Camp specialty!"},
+  {id:"eggs",    name:"Eggs & Bacon (serving)",  cat:"Real Food",  cal:280,carbs:1, sodium:600,caf:0,  notes:"Crew at Forest Lake / dawn"},
+  {id:"cheese",  name:"Grilled Cheese (half)",   cat:"Real Food",  cal:200,carbs:18,sodium:380,caf:0,  notes:"Crew favourite"},
+  {id:"ginger",  name:"Ginger Chew",             cat:"Supplement", cal:10, carbs:2, sodium:0,  caf:0,  notes:"Nausea prevention"},
+  {id:"salt",    name:"Salt Tab / Capsule",      cat:"Electrolyte",cal:0,  carbs:0, sodium:250,ml:0,  caf:0, notes:"SaltStick or Precision"},
+  {id:"ph",      name:"PH Electrolyte Mix",      cat:"Electrolyte",cal:10, carbs:2, sodium:500,ml:500,caf:0, notes:"Per serving, mixed in water"},
+  {id:"w500",    name:"Water (500ml)",            cat:"Hydration",  cal:0,  carbs:0, sodium:0,  ml:500,caf:0, notes:""},
+  {id:"w750",    name:"Water (750ml)",            cat:"Hydration",  cal:0,  carbs:0, sodium:0,  ml:750,caf:0, notes:""},
+  {id:"tailwind",name:"Tailwind (1 scoop)",       cat:"Hydration",  cal:100,carbs:25,sodium:310,ml:500,caf:0, notes:"Per scoop in water"},
+  {id:"ibu",     name:"Ibuprofen (200mg)",        cat:"Medical",    cal:0,  carbs:0, sodium:0,  caf:0,  notes:"Use sparingly"},
+  {id:"antacid", name:"Antacid (Tums)",           cat:"Medical",    cal:0,  carbs:0, sodium:0,  caf:0,  notes:""},
 ];
 
 const CATS = ["Fuel","Real Food","Hydration","Electrolyte","Supplement","Medical","Other"];
@@ -997,7 +997,7 @@ function renderLegModal(i){
     return `<div class="item-card" style="border-color:${col}33">
       <div class="item-info">
         <div class="item-name">${it.name}</div>
-        <div class="item-meta">${it.cal*qty} cal · ${it.carbs*qty}g carbs · ${it.sodium*qty}mg Na${it.ml?` · ${it.ml*qty}mL water`:""}</div>
+        <div class="item-meta">${it.cal*qty} cal · ${it.carbs*qty}g carbs · ${it.sodium*qty}mg Na${it.caf?` · ${it.caf*qty}mg caf`:""}${it.ml?` · ${it.ml*qty}mL water`:""}</div>
       </div>
       ${STATE.viewOnly?`<div class="stepper"><div class="step-val">${qty}</div></div>`:`
       <div class="stepper">
@@ -1075,7 +1075,7 @@ function openLegPicker(legIdx){
     return `<div class="item-card" style="border-color:${col}33">
       <div class="item-info">
         <div class="item-name">${it.name}</div>
-        <div class="item-meta">${it.cal} cal · ${it.carbs}g carbs · ${it.sodium}mg Na${it.ml?` · ${it.ml}mL water`:""}</div>
+        <div class="item-meta">${it.cal} cal · ${it.carbs}g carbs · ${it.sodium}mg Na${it.caf?` · ${it.caf}mg caf`:""}${it.ml?` · ${it.ml}mL water`:""}</div>
         ${it.notes?`<div class="item-note">${it.notes}</div>`:""}
       </div>
       <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
@@ -1572,7 +1572,7 @@ function renderDB(){
           <span class="item-name">${it.name}</span>
           ${badge(it.cat,col)}
         </div>
-        <div class="item-meta">${it.cal} cal · ${it.carbs}g carbs · ${it.sodium}mg Na${it.ml?` · ${it.ml}mL water`:""}</div>
+        <div class="item-meta">${it.cal} cal · ${it.carbs}g carbs · ${it.sodium}mg Na${it.caf?` · ${it.caf}mg caf`:""}${it.ml?` · ${it.ml}mL water`:""}</div>
         ${it.notes?`<div class="item-note">${it.notes}</div>`:""}
       </div>
       ${STATE.viewOnly?"":`<div style="display:flex;gap:4px">
@@ -1604,8 +1604,9 @@ function itemForm(item={}){
     </div>
     <div class="g2">
       <div class="field"><label>Sodium (mg)</label><input id="fi-sodium" type="number" value="${item.sodium||""}" placeholder="55"></div>
-      <div class="field"><label>Category</label><select id="fi-cat" onchange="document.getElementById('fi-ml-wrap').style.display=WATER_CATS.includes(this.value)?'block':'none'">${catOpts}</select></div>
+      <div class="field"><label>Caffeine (mg)</label><input id="fi-caf" type="number" value="${item.caf||""}" placeholder="0"></div>
     </div>
+    <div class="field"><label>Category</label><select id="fi-cat" onchange="document.getElementById('fi-ml-wrap').style.display=WATER_CATS.includes(this.value)?'block':'none'">${catOpts}</select></div>
     <div id="fi-ml-wrap" class="field" style="display:${showMl?"block":"none"}">
       <label>Water (mL)</label>
       <input id="fi-ml" type="number" value="${item.ml||""}" placeholder="e.g. 500">
@@ -1644,6 +1645,7 @@ function readItemForm(){
     cal:  Number(document.getElementById("fi-cal").value)||0,
     carbs:Number(document.getElementById("fi-carbs").value)||0,
     sodium:Number(document.getElementById("fi-sodium").value)||0,
+    caf:  Number(document.getElementById("fi-caf").value)||0,
     ml:   WATER_CATS.includes(cat) ? (Number(document.getElementById("fi-ml").value)||0) : 0,
     cat,
     notes:document.getElementById("fi-notes").value.trim(),
