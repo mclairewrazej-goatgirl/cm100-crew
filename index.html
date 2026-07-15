@@ -481,7 +481,7 @@ function fmtDist(miles){
     const km = n * MI_TO_KM;
     return km < 1 ? `${Math.round(km*1000)}m` : `${km.toFixed(1)}km`;
   }
-  return `${n}mi`;
+  return `${Math.round(n*10)/10}mi`;
 }
 
 // Vert: feet in, returns formatted string
