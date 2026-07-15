@@ -210,7 +210,7 @@ const STATIONS = [
   {name:"Halfmoon",sub:"★ FIRST PACER PICKUP",mile:43.4,delta:11.5,bag:true,crew:true,pacer:true,cutoff:"9:45 PM Fri",clock:"~4:30 PM",type:"crew",priority:true,
    logistics:"Arrive at trailhead, right through parking lot. ~1h49m drive from finish. First pacer pickup. Leaving (Halfmoon → Cow Camp return): retrace in reverse — Conical Pass viewed twice each direction (epic). Trail 119 back over pass, rocky/shale. Rocky trail with bridges back to Cow Camp.",
    food:"Major crew stop. Hot food — this is the last easy crew access for a while. Ginger chews start now.",gear:"⚠️ NIGHT GEAR STARTS HERE. Headlamp + spare batteries. Warm jacket/puffy. Long sleeve baselayer. Gloves. Night miles incoming."},
-  {name:"Conical Pass",sub:"Checkpoint only · cutoff tightened 2026",mile:50,delta:6.6,bag:false,crew:false,pacer:false,cutoff:"12:15 AM Sat",clock:"~7:30 PM",type:"warn",
+  {name:"Conical Pass",sub:"Checkpoint only · cutoff tightened 2026",mile:50,delta:6.6,bag:false,crew:false,pacer:false,cutoff:"12:15 AM Sat",clock:"~7:30 PM",type:"warn",checkpointOnly:true,
    logistics:"No crew. High alpine checkpoint only. ⚠️ Cutoff TIGHTENED 30 min for 2026 (was 12:45 AM). Arguably most breathtaking section of the entire race — views both directions. Weather can turn fast at altitude.",
    food:"Quick snack only. Gels or chews — don't linger.",gear:"Warm layer accessible. Windy and exposed at this elevation."},
   {name:"Cow Camp (return)",mile:54.8,delta:4.8,bag:false,crew:false,pacer:false,cutoff:"—",clock:"~9:00 PM",type:"remote",
@@ -268,6 +268,24 @@ const LEGS = STATIONS.slice(0,-1).map((s,i)=>({
     ["🏃 Straightforward — just tired legs","⚠️ NEW 2026 reservoir route","🏃 Ranch two-track to highway","🏁 Berg Ranch finish"],
   ][i]||[]
 }));
+
+// Fuel-plan leg groupings: a station flagged checkpointOnly (no crew, drop
+// bag, or pacer support — just a course/cutoff waypoint, e.g. Conical Pass)
+// doesn't get its own fuel-plan stop. Any leg landing on one folds into the
+// next leg that ends at a real aid/crew station. Course legs (LEGS) and
+// per-leg elevation stay indexed as-is — only the Fuel tab groups them.
+const FUEL_LEG_GROUPS = (()=>{
+  const groups = [];
+  let current = [];
+  LEGS.forEach((leg,i)=>{
+    current.push(i);
+    if(!STATIONS[i+1].checkpointOnly){
+      groups.push(current);
+      current = [];
+    }
+  });
+  return groups;
+})();
 
 // Elevation gain/loss per leg (ft), derived from the runner's CalTopo course
 // profile (99.56mi, min 5,154' / max 10,005', course totals +21,120' / -21,778').
@@ -700,6 +718,58 @@ function legMeetsTarget(tots, targets){
   if(targets.sodium>0) checks.push(tots.sodium >= targets.sodium);
   return checks.length ? checks.every(Boolean) : null;
 }
+
+// ── FUEL-PLAN LEG GROUPS ──────────────────────────────────────────────────
+// A fuel-plan leg can span more than one course leg (see FUEL_LEG_GROUPS).
+// These read/merge across the underlying leg indices for display, duration,
+// and nutrition totals — item storage itself stays keyed by the original
+// leg index (legKey/STATE.plan), so nothing needs migrating.
+function fuelGroupLeg(gi){
+  const idxs = FUEL_LEG_GROUPS[gi];
+  const first = LEGS[idxs[0]], last = LEGS[idxs[idxs.length-1]];
+  const tags = idxs.length>1
+    ? [...new Set(idxs.flatMap(i=>(STATE.legNotes[i]||{}).tags || LEGS[i].tags))]
+    : ((STATE.legNotes[idxs[0]]||{}).tags || first.tags);
+  return {
+    from:first.from, to:last.to, fromMile:first.fromMile, toMile:last.toMile,
+    dist: idxs.reduce((s,i)=>s+(LEGS[i].dist||0),0),
+    toType:last.toType, tags,
+  };
+}
+function fuelGroupItems(gi){
+  return FUEL_LEG_GROUPS[gi].flatMap(idx => legItems(idx).map(it=>({...it, legIdx:idx})));
+}
+function fuelGroupTotals(gi){
+  return FUEL_LEG_GROUPS[gi].reduce((a,idx)=>{
+    const t = legTotals(idx);
+    return {cal:a.cal+t.cal, carbs:a.carbs+t.carbs, sodium:a.sodium+t.sodium, ml:a.ml+t.ml};
+  }, {cal:0,carbs:0,sodium:0,ml:0});
+}
+function fuelGroupDurationMin(gi){
+  return FUEL_LEG_GROUPS[gi].reduce((s,idx)=>s+legDurationMin(idx), 0);
+}
+function fuelGroupTargets(gi){
+  const s = STATE.strategy;
+  const hrs = fuelGroupDurationMin(gi) / 60;
+  return {
+    cal:    Math.round(s.calPerHr * hrs),
+    carbs:  Math.round(s.carbsPerHr * hrs),
+    sodium: Math.round(s.sodiumPerHr * hrs),
+    ml:     Math.round(s.waterPerHr * hrs),
+  };
+}
+function fuelGroupElev(gi){
+  let gain=0, loss=0;
+  for(const idx of FUEL_LEG_GROUPS[gi]){
+    const g = legElevGain(idx), l = legElevLoss(idx);
+    if(g==null || l==null) return {gain:null, loss:null};
+    gain += g; loss += l;
+  }
+  return {gain,loss};
+}
+// New items added via the merged-leg UI go to the group's first underlying leg.
+function fuelGroupPrimaryIdx(gi){ return FUEL_LEG_GROUPS[gi][0]; }
+
 function progressBar(actual, target, col){
   const pct = target>0 ? Math.min(100, Math.round(actual/target*100)) : 0;
   const ok = pct>=80;
@@ -793,17 +863,18 @@ function renderFuel(){
     html += `<div class="warn-banner">⚙️ Sync not configured — tap the ⚙️ Sync tab to connect via GitHub Gist. Plan saves locally until then.</div>`;
   }
 
-  LEGS.forEach((leg,i)=>{
-    const tots = legTotals(i);
-    const items = legItems(i);
-    const durMin = legDurationMin(i);
-    const targets = legTargets(i);
+  FUEL_LEG_GROUPS.forEach((_,i)=>{
+    const leg = fuelGroupLeg(i);
+    const tots = fuelGroupTotals(i);
+    const items = fuelGroupItems(i);
+    const durMin = fuelGroupDurationMin(i);
+    const targets = fuelGroupTargets(i);
     const meets = legMeetsTarget(tots, targets);
+    const elev = fuelGroupElev(i);
     const typeClass = leg.toType==="warn"?"warn":leg.toType==="crew"?"crew":"remote";
     const toColor = leg.toType==="warn"?"var(--red)":leg.toType==="crew"?"var(--blue)":"var(--amber)";
 
-    const legTagOverride = (STATE.legNotes[i]||{}).tags;
-    const activeTags = legTagOverride||leg.tags;
+    const activeTags = leg.tags;
     const tagHtml = activeTags.slice(0,4).map(t=>{
       let col="var(--muted)";
       if(t.includes("⛰️"))col="var(--amber)";
@@ -835,8 +906,8 @@ function renderFuel(){
         <div class="leg-name">${leg.from} → ${leg.to}</div>
         <div class="leg-tags">${tagHtml}</div>
         <div style="font-size:9px;color:var(--muted);margin-top:2px">
-          <span style="color:var(--amber)">▲${legElevGain(i)!=null?fmtVert(legElevGain(i)):"—"}</span>
-          &nbsp;<span style="color:var(--blue)">▼${legElevLoss(i)!=null?fmtVert(legElevLoss(i)):"—"}</span>
+          <span style="color:var(--amber)">▲${elev.gain!=null?fmtVert(elev.gain):"—"}</span>
+          &nbsp;<span style="color:var(--blue)">▼${elev.loss!=null?fmtVert(elev.loss):"—"}</span>
           ${durMin?`&nbsp;<span style="color:var(--teal)">~${fmtLegTime(durMin)}</span>`:""}
         </div>
         <div style="font-size:9px;color:var(--teal);margin-top:2px">
@@ -881,12 +952,13 @@ function openLeg(i){
 }
 
 function renderLegModal(i){
-  const leg = LEGS[i];
-  const items = legItems(i);
-  const tots = legTotals(i);
+  const leg = fuelGroupLeg(i);
+  const items = fuelGroupItems(i);
+  const tots = fuelGroupTotals(i);
   const toStn = STATIONS.find(s=>s.name===leg.to);
-  const durMin = legDurationMin(i);
-  const targets = legTargets(i);
+  const durMin = fuelGroupDurationMin(i);
+  const targets = fuelGroupTargets(i);
+  const elev = fuelGroupElev(i);
 
   const totBar = tots.cal>0 ? `<div class="totals">
     ${[["cal",tots.cal,"var(--amber)"],["carbs",tots.carbs+"g","var(--green)"],["sodium",tots.sodium+"mg","var(--teal)"],
@@ -919,7 +991,7 @@ function renderLegModal(i){
     </div>`:""}
   </div>`;
 
-  const itemRows = items.map(({itemId,qty})=>{
+  const itemRows = items.map(({itemId,qty,legIdx})=>{
     const it=dbItem(itemId); if(!it) return "";
     const col=CAT_COLORS[it.cat]||"var(--muted)";
     return `<div class="item-card" style="border-color:${col}33">
@@ -929,11 +1001,11 @@ function renderLegModal(i){
       </div>
       ${STATE.viewOnly?`<div class="stepper"><div class="step-val">${qty}</div></div>`:`
       <div class="stepper">
-        <button class="step-btn" onclick="changeLegQty(${i},'${itemId}',${qty-1})">−</button>
+        <button class="step-btn" onclick="changeLegQty(${legIdx},'${itemId}',${qty-1})">−</button>
         <div class="step-val">${qty}</div>
-        <button class="step-btn" style="border-color:${col}66;background:${col}22;color:${col}" onclick="changeLegQty(${i},'${itemId}',${qty+1})">+</button>
+        <button class="step-btn" style="border-color:${col}66;background:${col}22;color:${col}" onclick="changeLegQty(${legIdx},'${itemId}',${qty+1})">+</button>
       </div>
-      <button onclick="changeLegQty(${i},'${itemId}',0)" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:0 2px">✕</button>`}
+      <button onclick="changeLegQty(${legIdx},'${itemId}',0)" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:0 2px">✕</button>`}
     </div>`;
   }).join("");
 
@@ -955,8 +1027,8 @@ function renderLegModal(i){
         <div style="font-weight:800;font-size:13px">${leg.from} → ${leg.to}</div>
         <div style="font-size:10px;color:var(--muted)">
           ${fmtDist(leg.dist)}
-          &nbsp;·&nbsp;<span style="color:var(--amber)">▲${legElevGain(i)!=null?fmtVert(legElevGain(i)):"—"}</span>
-          &nbsp;<span style="color:var(--blue)">▼${legElevLoss(i)!=null?fmtVert(legElevLoss(i)):"—"}</span>
+          &nbsp;·&nbsp;<span style="color:var(--amber)">▲${elev.gain!=null?fmtVert(elev.gain):"—"}</span>
+          &nbsp;<span style="color:var(--blue)">▼${elev.loss!=null?fmtVert(elev.loss):"—"}</span>
         </div>
       </div>
     </div>
@@ -972,6 +1044,9 @@ function renderLegModal(i){
   `);
 }
 
+// legIdx here is the underlying course-leg index an item actually lives
+// under (see fuelGroupItems), not the fuel-plan group index — so the modal
+// refresh below uses activeLegIdx (the open group) instead of legIdx.
 function changeLegQty(legIdx, itemId, qty){
   mutate(()=>{
     const key=legKey(legIdx), ex=STATE.plan[key]||[];
@@ -981,7 +1056,7 @@ function changeLegQty(legIdx, itemId, qty){
         ? ex.map(x=>x.itemId===itemId?{...x,qty}:x)
         : [...ex,{itemId,qty}];
   }, "plan");
-  renderLegModal(legIdx);
+  renderLegModal(activeLegIdx);
   renderTab("fuel");
 }
 
@@ -996,7 +1071,7 @@ function openLegPicker(legIdx){
   const items = STATE.nutDB.filter(it=>dbFilterCat==="All"||it.cat===dbFilterCat);
   const rows = items.map(it=>{
     const col=CAT_COLORS[it.cat]||"var(--muted)";
-    const alreadyQty=(STATE.plan[legKey(legIdx)]||[]).find(x=>x.itemId===it.id)?.qty||0;
+    const alreadyQty=fuelGroupItems(legIdx).filter(x=>x.itemId===it.id).reduce((s,x)=>s+x.qty,0);
     return `<div class="item-card" style="border-color:${col}33">
       <div class="item-info">
         <div class="item-name">${it.name}</div>
@@ -1028,8 +1103,14 @@ function setDBFilter(cat, legIdx){
 }
 
 function addToLeg(legIdx, itemId){
+  // legIdx is a fuel-plan group index (may span >1 underlying leg — see
+  // FUEL_LEG_GROUPS). Bump the item where it already lives in the group,
+  // otherwise add it fresh to the group's primary underlying leg.
   mutate(()=>{
-    const key=legKey(legIdx), ex=STATE.plan[key]||[];
+    const idxs = FUEL_LEG_GROUPS[legIdx];
+    const existingIdx = idxs.find(idx => (STATE.plan[legKey(idx)]||[]).some(x=>x.itemId===itemId));
+    const targetIdx = existingIdx !== undefined ? existingIdx : fuelGroupPrimaryIdx(legIdx);
+    const key=legKey(targetIdx), ex=STATE.plan[key]||[];
     const fi=ex.findIndex(x=>x.itemId===itemId);
     STATE.plan[key] = fi>=0 ? ex.map((x,i)=>i===fi?{...x,qty:x.qty+1}:x) : [...ex,{itemId,qty:1}];
   }, "plan");
