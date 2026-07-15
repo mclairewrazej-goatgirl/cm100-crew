@@ -1196,11 +1196,15 @@ function clockToElapsed(hhmm, startMin, prevElapsed){
 }
 
 // Build ETAs with cascading: an override on station i re-anchors all subsequent
-// auto stations proportionally for the remaining distance/time.
+// auto stations proportionally for the remaining distance/time. A logged actual
+// arrival on station i then shifts every following station's ETA by the
+// actual-vs-planned delta, preserving the planned gap between stations (rather
+// than compressing/stretching legs) so downstream ETAs stay easy to predict.
 function computeETAs(){
   const goalMinutes = STATE.pace.goalHours * 60;
   const startMin    = parseStartTime(STATE.pace.startTime || "06:00");
   const overrides   = STATE.pace.overrides || {};
+  const actuals     = STATE.pace.actuals || {};
 
   const results = [];
   let prevElapsed = 0;
@@ -1221,7 +1225,7 @@ function computeETAs(){
       for(let j = i-1; j >= 0; j--){
         if(j === 0 || overrides[j] !== undefined){
           anchorIdx = j;
-          anchorElapsed = results[j] ? results[j].minFromStart : 0;
+          anchorElapsed = results[j] ? results[j].plannedMinFromStart : 0;
           break;
         }
       }
@@ -1246,6 +1250,25 @@ function computeETAs(){
     }
 
     prevElapsed = minFromStart;
+    results.push({station:s, idx:i, plannedMinFromStart: minFromStart});
+  }
+
+  // Second pass: apply logged-actual shift. Each actual re-anchors the
+  // running offset (actual minus planned) that carries forward to every
+  // later station until the next logged actual takes over — the gaps
+  // between stations stay exactly as planned, only the whole tail shifts.
+  let shiftMin = 0;
+  let lastActualElapsed = 0;
+  for(let i = 0; i < results.length; i++){
+    const s = STATIONS[i];
+    let shiftedByActual = shiftMin !== 0;
+    if(actuals[i] !== undefined){
+      const actualElapsed = actualToElapsed(actuals[i], startMin, lastActualElapsed);
+      shiftMin = actualElapsed - results[i].plannedMinFromStart;
+      lastActualElapsed = actualElapsed;
+      shiftedByActual = true;
+    }
+    const minFromStart = Math.max(0, results[i].plannedMinFromStart + shiftMin);
 
     // Clock time
     const absoluteMin = startMin + minFromStart;
@@ -1263,7 +1286,8 @@ function computeETAs(){
     const autoElapsed = i === 0 ? 0 : Math.round((s.mile / 100) * goalMinutes);
     const vsGoal = minFromStart - autoElapsed; // positive = slower than goal pace
 
-    results.push({station:s, idx:i, minFromStart, hhmm, day, behindCutoff, cutoffBuffer, vsGoal, hasOverride: overrides[i]!==undefined});
+    Object.assign(results[i], {minFromStart, hhmm, day, behindCutoff, cutoffBuffer, vsGoal,
+      hasOverride: overrides[i]!==undefined, shiftedByActual});
   }
   return results;
 }
@@ -1843,8 +1867,8 @@ function renderAid(){
     const isOpen = STATE.openSections[`as-${i}`];
 
     const eta = etas[i];
-    const etaColor = eta.behindCutoff ? "var(--red)" : eta.hasOverride ? "var(--amber)" : "var(--teal)";
-    const etaLine = `${eta.day} ${eta.hhmm}${eta.hasOverride?" 📌":""}`;
+    const etaColor = eta.behindCutoff ? "var(--red)" : eta.hasOverride ? "var(--amber)" : eta.shiftedByActual ? "var(--green)" : "var(--teal)";
+    const etaLine = `${eta.day} ${eta.hhmm}${eta.hasOverride?" 📌":""}${!eta.hasOverride&&eta.shiftedByActual?" ✓":""}`;
 
     const badges = [
       s.crew?`${badge("CREW","#34D399")}`:"",
@@ -1863,7 +1887,7 @@ function renderAid(){
         <span class="lbl">Predicted arrival</span>
         <span class="val" style="color:${etaColor};font-weight:700">${etaLine} ✏️</span>
       </div>
-      <div class="row"><span class="lbl" style="font-size:9px;color:var(--muted)">Based on</span><span class="val" style="font-size:9px;color:var(--muted)">${eta.hasOverride?"your logged ETA (Pace tab)":`${goalLabel} goal pace`}</span></div>
+      <div class="row"><span class="lbl" style="font-size:9px;color:var(--muted)">Based on</span><span class="val" style="font-size:9px;color:var(--muted)">${eta.hasOverride?"your logged ETA (Pace tab)":eta.shiftedByActual?"logged actual arrival + planned pace":`${goalLabel} goal pace`}</span></div>
       ${eta.behindCutoff?`<div class="row"><span class="lbl" style="color:var(--red)">⚠️ Cutoff risk</span><span class="val" style="color:var(--red);font-weight:700">${fmtBuffer(eta.cutoffBuffer)}</span></div>`:""}
       <div class="row"><span class="lbl">Crew</span><span class="val" style="color:${s.crew?"var(--green)":"var(--muted)"}">${s.crew===true?"✓ Yes":s.crew===false?"✗ No":s.crew}</span></div>
       <div class="row"><span class="lbl">Drop bag</span><span class="val" style="color:${s.bag?"var(--blue)":"var(--muted)"}">${s.bag?"✓ Yes":"✗ No"}</span></div>
