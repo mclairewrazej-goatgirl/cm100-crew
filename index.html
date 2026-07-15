@@ -327,8 +327,8 @@ const DEFAULT_DB = [
   {id:"ginger",  name:"Ginger Chew",             cat:"Supplement", cal:10, carbs:2, sodium:0,  caf:0,  notes:"Nausea prevention"},
   {id:"salt",    name:"Salt Tab / Capsule",      cat:"Electrolyte",cal:0,  carbs:0, sodium:250,ml:0,  caf:0, notes:"SaltStick or Precision"},
   {id:"ph",      name:"PH Electrolyte Mix",      cat:"Electrolyte",cal:10, carbs:2, sodium:500,ml:500,caf:0, notes:"Per serving, mixed in water"},
-  {id:"w500",    name:"Water (500ml)",            cat:"Hydration",  cal:0,  carbs:0, sodium:0,  ml:500,caf:0, notes:""},
-  {id:"w750",    name:"Water (750ml)",            cat:"Hydration",  cal:0,  carbs:0, sodium:0,  ml:750,caf:0, notes:""},
+  {id:"w500",    name:"Water (500ml)",            cat:"Hydration",  cal:0,  carbs:0, sodium:0,  ml:500,caf:0, notes:"", noShop:true},
+  {id:"w750",    name:"Water (750ml)",            cat:"Hydration",  cal:0,  carbs:0, sodium:0,  ml:750,caf:0, notes:"", noShop:true},
   {id:"tailwind",name:"Tailwind (1 scoop)",       cat:"Hydration",  cal:100,carbs:25,sodium:310,ml:500,caf:0, notes:"Per scoop in water"},
   {id:"ibu",     name:"Ibuprofen (200mg)",        cat:"Medical",    cal:0,  carbs:0, sodium:0,  caf:0,  notes:"Use sparingly"},
   {id:"antacid", name:"Antacid (Tums)",           cat:"Medical",    cal:0,  carbs:0, sodium:0,  caf:0,  notes:""},
@@ -419,6 +419,7 @@ let STATE = {
   },
   gearSections: JSON.parse(JSON.stringify(DEFAULT_GEAR_SECTIONS)),
   gearChecked: {},
+  shoppingChecked: {},  // {itemId: bool} — local-only "bought it" state for the nutrition shopping list
   openSections: {},
   // Editable content — admin tab
   legNotes: {},        // {legIndex: {tags:[], courseNote:""}}
@@ -693,6 +694,20 @@ function legTotals(i){
   },{cal:0,carbs:0,sodium:0,ml:0});
 }
 function dbItem(id){ return STATE.nutDB.find(x=>x.id===id); }
+
+// Total planned quantity of each nutrition item across the whole fuel plan
+// (every leg), for the Gear tab's shopping list. Excludes items flagged
+// noShop (plain water — nothing to buy) and anything with 0 planned qty.
+function shoppingListItems(){
+  const totals = {};
+  Object.values(STATE.plan).forEach(items=>{
+    (items||[]).forEach(({itemId,qty})=>{ totals[itemId] = (totals[itemId]||0) + qty; });
+  });
+  return STATE.nutDB
+    .filter(it=>!it.noShop && totals[it.id]>0)
+    .map(it=>({...it, qty: totals[it.id]}))
+    .sort((a,b)=> CATS.indexOf(a.cat)-CATS.indexOf(b.cat) || a.name.localeCompare(b.name));
+}
 function uid(){ return "c"+ Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
 
 // Estimated time (minutes) to cover leg i, from the Pace tab's goal-time schedule
@@ -1611,7 +1626,10 @@ function itemForm(item={}){
       <label>Water (mL)</label>
       <input id="fi-ml" type="number" value="${item.ml||""}" placeholder="e.g. 500">
     </div>
-    <div class="field"><label>Notes</label><input id="fi-notes" value="${item.notes||""}" placeholder="Brand, timing, flavour…"></div>`;
+    <div class="field"><label>Notes</label><input id="fi-notes" value="${item.notes||""}" placeholder="Brand, timing, flavour…"></div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-top:2px;cursor:pointer">
+      <input id="fi-noshop" type="checkbox" ${item.noShop?"checked":""}> Skip in shopping list (e.g. plain water)
+    </label>`;
 }
 
 function openAddItemModal(returnLegIdx){
@@ -1649,6 +1667,7 @@ function readItemForm(){
     ml:   WATER_CATS.includes(cat) ? (Number(document.getElementById("fi-ml").value)||0) : 0,
     cat,
     notes:document.getElementById("fi-notes").value.trim(),
+    noShop: document.getElementById("fi-noshop").checked,
   };
 }
 
@@ -1844,9 +1863,51 @@ function toggleSection(key){
 // ═══════════════════════════════════════════════════════════
 // GEAR
 // ═══════════════════════════════════════════════════════════
+function renderNutritionShoppingList(){
+  const items = shoppingListItems();
+  const isOpen = STATE.openSections["gear-nutrition-shop"];
+  const bought = items.filter(it=>STATE.shoppingChecked[it.id]).length;
+  const col = "#F59E0B";
+
+  const body = !isOpen ? "" : (items.length===0
+    ? `<div style="font-size:11px;color:var(--muted);padding:10px 2px">No nutrition planned yet. Add items to legs in the <strong>Fuel Plan</strong> tab and they'll show up here.</div>`
+    : `<div style="margin-top:4px">` + items.map(it=>{
+        const checked = !!STATE.shoppingChecked[it.id];
+        const catCol = CAT_COLORS[it.cat]||"var(--muted)";
+        return `<div class="check-row" style="background:${checked?col+"18":"var(--card)"};border-color:${col}22;margin-bottom:4px" onclick="toggleShoppingItem('${it.id}')">
+          <div class="checkbox" style="border-color:${checked?col:"var(--muted)"};background:${checked?col:"transparent"}">
+            ${checked?`<span style="color:#000;font-size:12px;font-weight:900">✓</span>`:""}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:12px;color:${checked?"var(--muted)":"var(--text)"};text-decoration:${checked?"line-through":"none"}">${it.name}</div>
+            <div style="font-size:10px;color:var(--muted)">${badge(it.cat,catCol)}${it.notes?` · ${it.notes}`:""}</div>
+          </div>
+          <div style="font-weight:800;font-size:13px;color:${checked?"var(--muted)":col};flex-shrink:0">×${it.qty}</div>
+        </div>`;
+      }).join("") + `</div>`);
+
+  return `<div style="margin-bottom:14px">
+    <div onclick="toggleSection('gear-nutrition-shop')" style="background:${col}18;border:1.5px solid ${col}55;border-radius:10px;padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:800;font-size:12px;color:${col}">🛒 Nutrition Shopping List</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--muted)">${items.length?`${bought}/${items.length}`:"0"}</span>
+        <span style="color:var(--muted);font-size:14px">${isOpen?"▲":"▼"}</span>
+      </div>
+    </div>
+    ${body}
+  </div>`;
+}
+
+function toggleShoppingItem(itemId){
+  STATE.shoppingChecked[itemId] = !STATE.shoppingChecked[itemId];
+  saveLocal();
+  renderTab("gear");
+}
+
 function renderGear(){
   const sections = STATE.gearSections;
-  let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+  let html = renderNutritionShoppingList();
+  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
     <div style="font-size:12px;font-weight:700;color:var(--text)">Gear Checklists</div>
     <button class="btn sm muted" onclick="resetGearToDefault()">↺ Reset to defaults</button>
   </div>`;
