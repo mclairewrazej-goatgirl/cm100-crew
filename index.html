@@ -172,7 +172,8 @@
 </div>
 
 <div id="tabs">
-  <button class="tab active" data-tab="fuel" onclick="showTab('fuel')"><span class="icon">⛽</span>Fuel Plan</button>
+  <button class="tab active" data-tab="quickcheck" onclick="showTab('quickcheck')"><span class="icon">✅</span>Quick Chk</button>
+  <button class="tab" data-tab="fuel" onclick="showTab('fuel')"><span class="icon">⛽</span>Fuel Plan</button>
   <button class="tab" data-tab="pace" onclick="showTab('pace')"><span class="icon">⏱️</span>Pace</button>
   <button class="tab" data-tab="db" onclick="showTab('db')"><span class="icon">🍝</span>Food DB</button>
   <button class="tab" data-tab="strategy" onclick="showTab('strategy')"><span class="icon">📊</span>Strategy</button>
@@ -300,6 +301,13 @@ const FUEL_LEG_GROUPS = (()=>{
   return groups;
 })();
 
+// Quick Check tab: ordered station indices for the crew-facing stops the
+// runner named (Start, Ibex, Halfmoon, Sunlight, Crandall, Forest Lake).
+// Finish is deliberately excluded — it's a separate destination, not a
+// "will my crew be there" stop.
+const QUICKCHECK_STATION_IDX = ["Start","Ibex","Halfmoon","Sunlight","Crandall","Forest Lake"]
+  .map(n=>STATIONS.findIndex(s=>s.name===n));
+
 // Elevation gain/loss per leg (ft), derived from the runner's CalTopo course
 // profile (99.56mi, min 5,154' / max 10,005', course totals +21,120' / -21,778').
 // The source split table samples at 1km resolution, which undercounts true
@@ -413,7 +421,7 @@ let STATE = {
   // the timestamp comparison in loadFromGist().
   lastModified: {
     nutDB: 0, plan: 0, strategy: 0, pace: 0,
-    gearSections: 0, legNotes: 0, stationNotes: 0, crewInfo: 0, legElev: 0,
+    gearSections: 0, legNotes: 0, stationNotes: 0, crewInfo: 0, legElev: 0, quickCheck: 0,
   },
   nutDB: JSON.parse(JSON.stringify(DEFAULT_DB)),
   plan: {},
@@ -438,6 +446,11 @@ let STATE = {
   legNotes: {},        // {legIndex: {tags:[], courseNote:""}}
   stationNotes: {},    // {stationIndex: {logistics:"", food:"", gear:""}}
   legElev: {},          // {legIndex: {gain: ft|null, loss: ft|null}} — entered via Admin, blank until real course data is available
+  quickCheck: {
+    off: {},          // {stationIdx: true} — stops the crew has turned OFF (not staffing). Missing/false = on.
+    gear: {},         // {stationIdx: [{id, text}]} — manually-entered handoff gear per crew stop
+    gearChecked: {},  // {"stationIdx-itemId": true} — checked once handed to the runner
+  },
   crewInfo: {
     driving: [
       {leg:"Start → Ibex",          time:"~1.5 hrs",    note:"Road accessible.",                                       warn:false},
@@ -467,7 +480,8 @@ let STATE = {
 let syncTimer = null;
 let lastSyncedJSON = "";
 let activeLegIdx = null;
-let activeTab = "fuel";
+let activeQCIdx = null;
+let activeTab = "quickcheck";
 let dbFilterCat = "All";
 let editingItemId = null;
 let useMetric = false;  // false = mi/ft, true = km/m
@@ -572,7 +586,7 @@ function gistHeaders(){
   };
 }
 
-const SYNCED_KEYS = ["nutDB","plan","strategy","pace","gearSections","legNotes","stationNotes","crewInfo","legElev"];
+const SYNCED_KEYS = ["nutDB","plan","strategy","pace","gearSections","legNotes","stationNotes","crewInfo","legElev","quickCheck"];
 
 // Treats empty/default values (the shape of a freshly-created, never-pushed
 // Gist) as "no real data" so they can't stomp real local data on merge.
@@ -873,7 +887,8 @@ function showTab(tab){
 }
 function renderTab(tab){
   const c = document.getElementById("content");
-  if(tab==="fuel")     c.innerHTML = renderFuel();
+  if(tab==="quickcheck") c.innerHTML = renderQuickCheck();
+  else if(tab==="fuel")     c.innerHTML = renderFuel();
   else if(tab==="admin") c.innerHTML = renderAdmin();
   else if(tab==="pace") c.innerHTML = renderPace();
   else if(tab==="db")  c.innerHTML = renderDB();
@@ -882,6 +897,294 @@ function renderTab(tab){
   else if(tab==="gear") c.innerHTML = renderGear();
   else if(tab==="crew") c.innerHTML = renderCrew();
   else if(tab==="settings") c.innerHTML = renderSettings();
+}
+
+// ═══════════════════════════════════════════════════════════
+// QUICK CHECK — crew-only summary of the stops the runner will actually see
+// ═══════════════════════════════════════════════════════════
+function qcIsActive(stationIdx){ return !STATE.quickCheck.off[stationIdx]; }
+function qcActiveList(){ return QUICKCHECK_STATION_IDX.filter(qcIsActive); }
+
+function qcToggle(stationIdx){
+  mutate(()=>{
+    if(STATE.quickCheck.off[stationIdx]) delete STATE.quickCheck.off[stationIdx];
+    else STATE.quickCheck.off[stationIdx] = true;
+  }, "quickCheck");
+  renderTab("quickcheck");
+}
+
+// Sum planned fuel across every underlying leg between two stations
+// [fromIdx, toIdx) — this is how a turned-off stop's fuel needs fold
+// forward into the next stop the crew is actually covering.
+function qcFuelTotals(fromIdx, toIdx){
+  const out = {cal:0, carbs:0, sodium:0, ml:0};
+  for(let i=fromIdx; i<toIdx; i++){
+    const t = legTotals(i);
+    out.cal+=t.cal; out.carbs+=t.carbs; out.sodium+=t.sodium; out.ml+=t.ml;
+  }
+  return out;
+}
+function qcFuelItems(fromIdx, toIdx){
+  const totals = {};
+  for(let i=fromIdx; i<toIdx; i++){
+    legItems(i).forEach(({itemId,qty})=>{ totals[itemId] = (totals[itemId]||0) + qty; });
+  }
+  return Object.entries(totals)
+    .filter(([,qty])=>qty>0)
+    .map(([itemId,qty])=>({itemId,qty}))
+    .sort((a,b)=>{
+      const ia=dbItem(a.itemId), ib=dbItem(b.itemId);
+      return CATS.indexOf(ia?.cat) - CATS.indexOf(ib?.cat) || (ia?.name||"").localeCompare(ib?.name||"");
+    });
+}
+function qcTargets(durMin){
+  const s = STATE.strategy;
+  const hrs = (durMin||0)/60;
+  return {
+    cal:    Math.round(s.calPerHr * hrs),
+    carbs:  Math.round(s.carbsPerHr * hrs),
+    sodium: Math.round(s.sodiumPerHr * hrs),
+    ml:     Math.round(s.waterPerHr * hrs),
+  };
+}
+
+// Manual handoff-gear items for stationIdx, plus any turned-off Quick Check
+// stops between the previous active stop (exclusive) and it — those fold
+// forward the same way fuel does.
+function qcGearItems(fromIdxExclusive, toIdxInclusive){
+  return QUICKCHECK_STATION_IDX
+    .filter(i => i>fromIdxExclusive && i<=toIdxInclusive)
+    .flatMap(i => (STATE.quickCheck.gear[i]||[]).map(item=>({...item, stationIdx:i})));
+}
+
+// Bundles everything a Quick Check card needs for one active stop: the
+// stretch since the last covered stop (for context) and the stretch to the
+// next one (fuel to hand off, ETA gap, elevation) — including a fallback to
+// the Finish when this is the last stop the crew is covering.
+function qcStopInfo(stationIdx){
+  const etas = computeETAs();
+  const activeList = qcActiveList();
+  const k = activeList.indexOf(stationIdx);
+  const prevIdx = k>0 ? activeList[k-1] : null;
+  const nextIdx = k<activeList.length-1 ? activeList[k+1] : null;
+  const finishIdx = STATIONS.length-1;
+  const nextTargetIdx = nextIdx!=null ? nextIdx : (stationIdx===finishIdx ? null : finishIdx);
+  const eta = etas[stationIdx];
+
+  const sinceLast = prevIdx!=null ? {
+    fromName: STATIONS[prevIdx].name,
+    dist: STATIONS[stationIdx].mile - STATIONS[prevIdx].mile,
+    elev: sumLegElev(prevIdx, stationIdx),
+    durMin: eta.minFromStart - etas[prevIdx].minFromStart,
+  } : null;
+
+  const toNext = nextTargetIdx!=null ? {
+    toName: STATIONS[nextTargetIdx].name,
+    isFinish: nextTargetIdx===finishIdx && nextIdx==null,
+    dist: STATIONS[nextTargetIdx].mile - STATIONS[stationIdx].mile,
+    elev: sumLegElev(stationIdx, nextTargetIdx),
+    durMin: etas[nextTargetIdx].minFromStart - eta.minFromStart,
+  } : null;
+
+  return {
+    idx: stationIdx, eta, prevIdx, nextIdx, sinceLast, toNext,
+    fuelTotals: nextTargetIdx!=null ? qcFuelTotals(stationIdx, nextTargetIdx) : {cal:0,carbs:0,sodium:0,ml:0},
+    fuelItems:  nextTargetIdx!=null ? qcFuelItems(stationIdx, nextTargetIdx) : [],
+    gearItems:  qcGearItems(prevIdx!=null ? prevIdx : -1, stationIdx),
+  };
+}
+
+function renderQuickCheck(){
+  const activeList = qcActiveList();
+
+  let html = `<div style="font-size:12px;font-weight:700;margin-bottom:4px">Crew Stops</div>
+  <div style="font-size:10px;color:var(--muted);line-height:1.5;margin-bottom:10px">Tap a stop below to turn crew coverage on/off. Anything turned off — fuel, gear, distance — folds into the next stop you're covering.</div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
+    ${QUICKCHECK_STATION_IDX.map(idx=>{
+      const on = qcIsActive(idx);
+      return `<button class="btn sm ${on?"":"muted"}" style="${on?"":"text-decoration:line-through"}" onclick="qcToggle(${idx})">${STATIONS[idx].name}</button>`;
+    }).join("")}
+  </div>`;
+
+  if(activeList.length===0){
+    html += `<div class="warn-banner">No crew stops turned on — tap a stop above to enable it.</div>`;
+    return html;
+  }
+
+  activeList.forEach(idx=>{
+    const s = STATIONS[idx];
+    const info = qcStopInfo(idx);
+    const eta = info.eta;
+    const etaColor = eta.behindCutoff ? "var(--red)" : eta.hasOverride ? "var(--amber)" : eta.shiftedByActual ? "var(--green)" : "var(--teal)";
+    const etaLine = `${eta.day} ${eta.hhmm}`;
+
+    const fuelBadges = info.fuelItems.length>0
+      ? info.fuelItems.slice(0,4).map(({itemId,qty})=>{
+          const it=dbItem(itemId); if(!it) return "";
+          const col=CAT_COLORS[it.cat]||"var(--muted)";
+          return badge(`${qty}× ${it.name.split(" ").slice(0,2).join(" ")}`, col);
+        }).join(" ") + (info.fuelItems.length>4 ? badge(`+${info.fuelItems.length-4} more`,"var(--muted)") : "")
+      : (info.toNext ? `<span style="font-size:10px;color:var(--muted);font-style:italic">No fuel planned yet — add in Fuel Plan tab</span>` : "");
+
+    const gearDone = info.gearItems.filter(it=>STATE.quickCheck.gearChecked[`${it.stationIdx}-${it.id}`]).length;
+
+    html += `<div class="leg-card card crew" onclick="openQCStation(${idx})">
+      <div class="leg-miles">
+        <div class="from" style="color:var(--teal);font-size:14px">${fmtMile(s.mile)}</div>
+        <div class="dist">${unitLabel()}</div>
+      </div>
+      <div class="leg-content">
+        <div class="leg-name">${s.name}${s.sub?` <span style="font-size:9px;color:var(--muted);font-weight:500">· ${s.sub}</span>`:""}</div>
+        <div style="font-size:10px;font-weight:700;margin-top:2px;color:${etaColor}">ETA ${etaLine}${eta.behindCutoff?" ⚠️":""}</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:3px;line-height:1.5">
+          ${info.sinceLast?`Since ${info.sinceLast.fromName}: ${fmtDist(info.sinceLast.dist)} · ~${fmtLegTime(info.sinceLast.durMin)}<br>`:"Race start<br>"}
+          ${info.toNext?`<span style="color:var(--text)">→ ${info.toNext.toName}${info.toNext.isFinish?" 🏁":""}: ${fmtDist(info.toNext.dist)} · ~${fmtLegTime(info.toNext.durMin)} · ${info.toNext.elev?`▲${fmtVert(info.toNext.elev.gain)} ▼${fmtVert(info.toNext.elev.loss)}`:"—"}</span>`:`<span style="color:var(--muted)">Last covered stop</span>`}
+        </div>
+        <div class="leg-items" style="margin-top:5px">${fuelBadges}</div>
+      </div>
+      <div class="leg-cal">
+        ${info.gearItems.length?`<div style="font-size:10px;color:var(--muted)">🎒 ${gearDone}/${info.gearItems.length}</div>`:""}
+        <div style="color:var(--muted);font-size:14px;margin-top:4px">›</div>
+      </div>
+    </div>`;
+  });
+
+  return html;
+}
+
+function openQCStation(idx){
+  activeQCIdx = idx;
+  renderQCModal(idx);
+}
+
+function renderQCModal(idx){
+  const s = STATIONS[idx];
+  const info = qcStopInfo(idx);
+  const eta = info.eta;
+  const etaColor = eta.behindCutoff ? "var(--red)" : eta.hasOverride ? "var(--amber)" : eta.shiftedByActual ? "var(--green)" : "var(--teal)";
+  const targets = info.toNext ? qcTargets(info.toNext.durMin) : {cal:0,carbs:0,sodium:0,ml:0};
+  const tots = info.fuelTotals;
+
+  const totBar = tots.cal>0 ? `<div class="totals">
+    ${[["cal",tots.cal,"var(--amber)"],["carbs",tots.carbs+"g","var(--green)"],["sodium",tots.sodium+"mg","var(--teal)"],
+       ...(tots.ml>0?[["water",tots.ml+"mL","var(--blue)"]]:[])].map(([l,v,col])=>`
+    <div class="total-box" style="background:${col}18;border-color:${col}33">
+      <div class="val" style="color:${col}">${v}</div><div class="lbl">${l}</div>
+    </div>`).join("")}
+  </div>` : "";
+
+  const targetBox = info.toNext ? `<div class="card" style="padding:10px 12px;margin-bottom:10px;border-color:#2DD4BF33">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:10px;font-weight:800;color:var(--teal);letter-spacing:1px">FUEL FOR THE VEST — NEXT LEG</div>
+      <div style="font-size:10px;color:var(--muted)">~${fmtLegTime(info.toNext.durMin)} est.</div>
+    </div>
+    <div style="margin-bottom:8px"><div style="font-size:10px;color:var(--muted)">Carbs · target ${targets.carbs}g</div>${progressBar(tots.carbs, targets.carbs, "var(--green)")}</div>
+    <div style="margin-bottom:8px"><div style="font-size:10px;color:var(--muted)">Sodium · target ${targets.sodium.toLocaleString()}mg</div>${progressBar(tots.sodium, targets.sodium, "var(--teal)")}</div>
+    <div style="margin-bottom:8px"><div style="font-size:10px;color:var(--muted)">Calories · target ${targets.cal.toLocaleString()}</div>${progressBar(tots.cal, targets.cal, "var(--amber)")}</div>
+    ${targets.ml>0?`<div><div style="font-size:10px;color:var(--muted)">Water · target ${targets.ml.toLocaleString()}mL</div>${progressBar(tots.ml, targets.ml, "var(--blue)")}</div>`:""}
+  </div>` : `<div class="warn-banner">This is the last stop you're covering — next time you'll see them is the finish!</div>`;
+
+  const itemRows = info.fuelItems.map(({itemId,qty})=>{
+    const it=dbItem(itemId); if(!it) return "";
+    const col=CAT_COLORS[it.cat]||"var(--muted)";
+    return `<div class="item-card" style="border-color:${col}33">
+      <div class="item-info">
+        <div class="item-name">${it.name}</div>
+        <div class="item-meta">${it.cal*qty} cal · ${it.carbs*qty}g carbs · ${it.sodium*qty}mg Na${it.caf?` · ${it.caf*qty}mg caf`:""}${it.ml?` · ${it.ml*qty}mL water`:""}</div>
+      </div>
+      <div class="step-val" style="font-size:14px;font-weight:800;color:${col}">×${qty}</div>
+    </div>`;
+  }).join("");
+
+  const gearRows = info.gearItems.map(item=>{
+    const key = `${item.stationIdx}-${item.id}`;
+    const checked = !!STATE.quickCheck.gearChecked[key];
+    const foldedNote = item.stationIdx!==idx ? `<div style="font-size:9px;color:var(--amber)">from ${STATIONS[item.stationIdx].name} (turned off)</div>` : "";
+    return `<div class="check-row" style="background:${checked?"#34D39918":"var(--card)"};border-color:${checked?"#34D39944":"#fff2"}" onclick="qcToggleGearChecked('${key}')">
+      <div class="checkbox" style="border-color:${checked?"var(--green)":"var(--muted)"};background:${checked?"var(--green)":"transparent"}">
+        ${checked?`<span style="color:#000;font-size:12px;font-weight:900">✓</span>`:""}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:12px;color:${checked?"var(--muted)":"var(--text)"};text-decoration:${checked?"line-through":"none"}">${item.text}</div>
+        ${foldedNote}
+      </div>
+      ${STATE.viewOnly?"":`<button onclick="event.stopPropagation(); qcDeleteGearItem(${item.stationIdx},'${item.id}')" style="background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:2px 4px;flex-shrink:0">🗑</button>`}
+    </div>`;
+  }).join("");
+
+  const tipsText = (STATE.stationNotes[idx]||{}).crewTips || s.crewTips;
+
+  openModal(`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <button class="btn sm muted" onclick="closeModal()">← Back</button>
+      <div>
+        <div style="font-weight:800;font-size:13px">${s.name} <span style="font-weight:600;color:var(--muted);font-size:11px">· mi ${fmtMile(s.mile)}</span></div>
+        <div style="font-size:10px;font-weight:700;color:${etaColor}">ETA ${eta.day} ${eta.hhmm}${eta.behindCutoff?" ⚠️ behind cutoff":""}</div>
+      </div>
+    </div>
+    ${tipsText?`<div class="terrain-box"><div class="lbl">CREW TIPS</div><div style="font-size:10px;color:var(--dim);line-height:1.6">${tipsText}</div></div>`:""}
+    <div class="g2" style="margin-bottom:12px">
+      <div class="card" style="padding:8px 10px">
+        <div style="font-size:9px;color:var(--muted);font-weight:800;margin-bottom:3px">SINCE LAST STOP</div>
+        ${info.sinceLast?`<div style="font-size:12px;font-weight:700">${fmtDist(info.sinceLast.dist)}</div>
+          <div style="font-size:9px;color:var(--muted)">~${fmtLegTime(info.sinceLast.durMin)} from ${info.sinceLast.fromName}</div>
+          <div style="font-size:9px;color:var(--muted)">${info.sinceLast.elev?`▲${fmtVert(info.sinceLast.elev.gain)} ▼${fmtVert(info.sinceLast.elev.loss)}`:"—"}</div>`
+          :`<div style="font-size:11px;color:var(--muted)">Race start</div>`}
+      </div>
+      <div class="card" style="padding:8px 10px">
+        <div style="font-size:9px;color:var(--muted);font-weight:800;margin-bottom:3px">TO NEXT STOP</div>
+        ${info.toNext?`<div style="font-size:12px;font-weight:700;color:var(--teal)">${fmtDist(info.toNext.dist)}</div>
+          <div style="font-size:9px;color:var(--muted)">~${fmtLegTime(info.toNext.durMin)} to ${info.toNext.toName}${info.toNext.isFinish?" 🏁":""}</div>
+          <div style="font-size:9px;color:var(--muted)">${info.toNext.elev?`▲${fmtVert(info.toNext.elev.gain)} ▼${fmtVert(info.toNext.elev.loss)}`:"—"}</div>`
+          :`<div style="font-size:11px;color:var(--muted)">Last covered stop</div>`}
+      </div>
+    </div>
+    ${targetBox}
+    ${totBar}
+    ${itemRows||(info.toNext?`<div style="text-align:center;padding:14px 0;color:var(--muted);font-size:12px">No fuel planned yet — add it in the Fuel Plan tab</div>`:"")}
+    <div class="sh" style="margin-top:18px">🎒 Gear to hand off</div>
+    ${gearRows||`<div style="text-align:center;padding:10px 0;color:var(--muted);font-size:11px">No gear items yet</div>`}
+    ${STATE.viewOnly?"":`<button class="btn sm green" style="width:100%;margin-top:8px" onclick="qcOpenAddGear(${idx})">＋ Add gear item</button>`}
+  `);
+}
+
+function qcToggleGearChecked(key){
+  mutate(()=>{
+    STATE.quickCheck.gearChecked[key] = !STATE.quickCheck.gearChecked[key];
+  }, "quickCheck");
+  renderQCModal(activeQCIdx);
+  renderTab("quickcheck");
+}
+
+function qcOpenAddGear(idx){
+  openModal(`
+    <h2>Add Gear Item</h2>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Handing off at: <strong style="color:var(--text)">${STATIONS[idx].name}</strong></div>
+    <div class="field"><label>Item *</label><input id="qc-gear-name" placeholder="e.g. Dry socks"></div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn sm muted" onclick="renderQCModal(${idx})">Cancel</button>
+      <button class="btn green" onclick="qcSaveGear(${idx})">Add</button>
+    </div>`);
+}
+
+function qcSaveGear(idx){
+  const name = document.getElementById("qc-gear-name").value.trim();
+  if(!name){ alert("Item name required"); return; }
+  mutate(()=>{
+    STATE.quickCheck.gear[idx] = [...(STATE.quickCheck.gear[idx]||[]), {id:uid(), text:name}];
+  }, "quickCheck");
+  toast("Gear item added");
+  renderQCModal(idx);
+  renderTab("quickcheck");
+}
+
+function qcDeleteGearItem(stationIdx, itemId){
+  mutate(()=>{
+    STATE.quickCheck.gear[stationIdx] = (STATE.quickCheck.gear[stationIdx]||[]).filter(it=>it.id!==itemId);
+    delete STATE.quickCheck.gearChecked[`${stationIdx}-${itemId}`];
+  }, "quickCheck");
+  renderQCModal(activeQCIdx);
+  renderTab("quickcheck");
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2663,7 +2966,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   loadLocal();
   try{ useMetric = localStorage.getItem("cm100_metric") === "1"; }catch(e){}
   document.getElementById("unit-toggle").textContent = useMetric ? "km/m" : "mi/ft";
-  renderTab("fuel");
+  renderTab("quickcheck");
   updateViewOnlyBadge();
   startPolling();
   if(syncReady()){
