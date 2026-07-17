@@ -172,7 +172,7 @@
 </div>
 
 <div id="tabs">
-  <button class="tab active" data-tab="quickcheck" onclick="showTab('quickcheck')"><span class="icon">✅</span>Quick Chk</button>
+  <button class="tab active" data-tab="quickcheck" onclick="showTab('quickcheck')"><span class="icon">✅</span>Quick Check</button>
   <button class="tab" data-tab="fuel" onclick="showTab('fuel')"><span class="icon">⛽</span>Fuel Plan</button>
   <button class="tab" data-tab="pace" onclick="showTab('pace')"><span class="icon">⏱️</span>Pace</button>
   <button class="tab" data-tab="db" onclick="showTab('db')"><span class="icon">🍝</span>Food DB</button>
@@ -1156,15 +1156,79 @@ function qcToggleGearChecked(key){
   renderTab("quickcheck");
 }
 
+let qcAddGearSection = 0;
+let qcAddGearSelected = new Set();
+
 function qcOpenAddGear(idx){
+  qcAddGearSection = 0;
+  qcAddGearSelected = new Set();
+  renderQCAddGearModal(idx);
+}
+
+function qcSetAddGearSection(idx, si){
+  qcAddGearSection = si;
+  renderQCAddGearModal(idx);
+}
+
+function qcToggleAddGearSelect(idx, si, ii){
+  const key = `${si}-${ii}`;
+  if(qcAddGearSelected.has(key)) qcAddGearSelected.delete(key);
+  else qcAddGearSelected.add(key);
+  renderQCAddGearModal(idx);
+}
+
+function renderQCAddGearModal(idx){
+  const existingTexts = new Set((STATE.quickCheck.gear[idx]||[]).map(it=>it.text));
+  const sections = STATE.gearSections;
+
+  const tabs = sections.map((sec,si)=>`
+    <button class="btn sm ${si===qcAddGearSection?"":"muted"}" style="border-color:${sec.col}" onclick="qcSetAddGearSection(${idx},${si})">${sec.name}</button>
+  `).join("");
+
+  const sec = sections[qcAddGearSection];
+  const rows = (sec?.items||[]).map((it,ii)=>{
+    if(existingTexts.has(it.i)) return "";
+    const key = `${qcAddGearSection}-${ii}`;
+    const sel = qcAddGearSelected.has(key);
+    return `<div class="check-row" style="background:${sel?sec.col+"18":"var(--card)"};border-color:${sel?sec.col+"66":"#fff2"}" onclick="qcToggleAddGearSelect(${idx},${qcAddGearSection},${ii})">
+      <div class="checkbox" style="border-color:${sel?sec.col:"var(--muted)"};background:${sel?sec.col:"transparent"}">
+        ${sel?`<span style="color:#000;font-size:12px;font-weight:900">✓</span>`:""}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:12px">${it.i}</div>
+        ${it.n?`<div style="font-size:10px;color:var(--muted)">${it.n}</div>`:""}
+      </div>
+    </div>`;
+  }).join("") || `<div style="text-align:center;padding:10px 0;color:var(--muted);font-size:11px">${sec ? "All items from this list are already on the hand-off list." : "No gear lists yet — add some in the Gear tab."}</div>`;
+
   openModal(`
     <h2>Add Gear Item</h2>
     <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Handing off at: <strong style="color:var(--text)">${STATIONS[idx].name}</strong></div>
+    <div style="font-size:10px;font-weight:800;color:var(--muted);letter-spacing:1px;margin-bottom:6px">FROM YOUR GEAR LISTS</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${tabs}</div>
+    <div style="margin-bottom:14px">${rows}</div>
+    <button class="btn green" style="width:100%;margin-bottom:16px" onclick="qcAddSelectedGear(${idx})">＋ Add ${qcAddGearSelected.size||""} selected</button>
+    <div class="sh">Or add a custom item</div>
     <div class="field"><label>Item *</label><input id="qc-gear-name" placeholder="e.g. Dry socks"></div>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="btn sm muted" onclick="renderQCModal(${idx})">Cancel</button>
-      <button class="btn green" onclick="qcSaveGear(${idx})">Add</button>
+      <button class="btn green" onclick="qcSaveGear(${idx})">Add Custom</button>
     </div>`);
+}
+
+function qcAddSelectedGear(idx){
+  if(qcAddGearSelected.size===0){ alert("Select at least one item"); return; }
+  const toAdd = [...qcAddGearSelected].map(key=>{
+    const [si,ii] = key.split("-").map(Number);
+    return STATE.gearSections[si]?.items[ii];
+  }).filter(Boolean);
+  mutate(()=>{
+    STATE.quickCheck.gear[idx] = [...(STATE.quickCheck.gear[idx]||[]), ...toAdd.map(it=>({id:uid(), text:it.i}))];
+  }, "quickCheck");
+  toast(`${toAdd.length} gear item${toAdd.length===1?"":"s"} added`);
+  qcAddGearSelected = new Set();
+  renderQCModal(idx);
+  renderTab("quickcheck");
 }
 
 function qcSaveGear(idx){
