@@ -2759,7 +2759,7 @@ function renderAdminDriving(){
   return `
     ${driving.map((l,i)=>`
     <div style="background:var(--card);border-radius:8px;padding:11px 13px;margin-bottom:8px;border:1px solid #fff1">
-      <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:8px">Leg ${i+1}: ${l.leg}</div>
+      <div class="field" style="margin-bottom:8px"><label>Leg ${i+1}</label><input id="drv-leg-${i}" value="${l.leg.replace(/"/g,'&quot;')}"></div>
       <div class="g2" style="margin-bottom:8px">
         <div class="field" style="margin-bottom:0"><label>Drive time</label><input id="drv-time-${i}" value="${l.time}"></div>
         <div class="field" style="margin-bottom:0">
@@ -2768,7 +2768,10 @@ function renderAdminDriving(){
         </div>
       </div>
       <div class="field" style="margin-bottom:8px"><label>Note</label><input id="drv-note-${i}" value="${l.note.replace(/"/g,'&quot;')}"></div>
-      <button class="btn sm green" onclick="saveDrivingLeg(${i})">Save</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn sm red" onclick="deleteDrivingLeg(${i})">Delete</button>
+        <button class="btn sm green" onclick="saveDrivingLeg(${i})">Save</button>
+      </div>
     </div>`).join("")}
     <button class="btn sm" style="width:100%;margin-top:4px" onclick="addDrivingLeg()">＋ Add driving leg</button>`;
 }
@@ -2776,13 +2779,19 @@ function renderAdminDriving(){
 function saveDrivingLeg(i){
   mutate(()=>{
     STATE.crewInfo.driving[i] = {
-      leg:  STATE.crewInfo.driving[i].leg,
+      leg:  document.getElementById(`drv-leg-${i}`).value.trim(),
       time: document.getElementById(`drv-time-${i}`).value.trim(),
       note: document.getElementById(`drv-note-${i}`).value.trim(),
       warn: document.getElementById(`drv-warn-${i}`).value === "true",
     };
   }, "crewInfo");
   toast("Saved");
+  renderTab("admin");
+}
+
+function deleteDrivingLeg(i){
+  if(!confirm("Delete this driving leg?")) return;
+  mutate(()=>{ STATE.crewInfo.driving.splice(i,1); }, "crewInfo");
   renderTab("admin");
 }
 
