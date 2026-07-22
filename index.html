@@ -308,6 +308,11 @@ const FUEL_LEG_GROUPS = (()=>{
 const QUICKCHECK_STATION_IDX = ["Start","Ibex","Halfmoon","Sunlight","Crandall","Forest Lake"]
   .map(n=>STATIONS.findIndex(s=>s.name===n));
 
+// Huntin Camp gets its own small section at the bottom of Quick Check —
+// it's drop bag only (no crew access in 2026), so it doesn't belong in the
+// ETA/fuel-handoff flow the crew stops above use.
+const HUNTIN_CAMP_IDX = STATIONS.findIndex(s=>s.name==="Huntin Camp");
+
 // Elevation gain/loss per leg (ft), derived from the runner's CalTopo course
 // profile (99.56mi, min 5,154' / max 10,005', course totals +21,120' / -21,778').
 // The source split table samples at 1km resolution, which undercounts true
@@ -1008,7 +1013,7 @@ function renderQuickCheck(){
 
   if(activeList.length===0){
     html += `<div class="warn-banner">No crew stops turned on — tap a stop above to enable it.</div>`;
-    return html;
+    return html + renderDropBagSection();
   }
 
   activeList.forEach(idx=>{
@@ -1049,7 +1054,52 @@ function renderQuickCheck(){
     </div>`;
   });
 
-  return html;
+  return html + renderDropBagSection();
+}
+
+// Huntin Camp — drop bag only, no crew in 2026. Kept separate from the
+// crew-stop cards above (no ETA/fuel handoff — nobody's there to hand
+// anything off). Reuses the same STATE.quickCheck.gear/gearChecked maps
+// as the crew stops, just rendered and wired up standalone so it never
+// touches the crew-stop modal or its stale activeQCIdx.
+function dbToggleChecked(itemId){
+  mutate(()=>{
+    const key = `${HUNTIN_CAMP_IDX}-${itemId}`;
+    STATE.quickCheck.gearChecked[key] = !STATE.quickCheck.gearChecked[key];
+  }, "quickCheck");
+  renderTab("quickcheck");
+}
+function dbDeleteGearItem(itemId){
+  mutate(()=>{
+    STATE.quickCheck.gear[HUNTIN_CAMP_IDX] = (STATE.quickCheck.gear[HUNTIN_CAMP_IDX]||[]).filter(it=>it.id!==itemId);
+    delete STATE.quickCheck.gearChecked[`${HUNTIN_CAMP_IDX}-${itemId}`];
+  }, "quickCheck");
+  renderTab("quickcheck");
+}
+function dbOpenAddGear(){
+  qcOpenAddGear(HUNTIN_CAMP_IDX, closeModal);
+}
+
+function renderDropBagSection(){
+  const items = STATE.quickCheck.gear[HUNTIN_CAMP_IDX]||[];
+  const rows = items.map(item=>{
+    const checked = !!STATE.quickCheck.gearChecked[`${HUNTIN_CAMP_IDX}-${item.id}`];
+    return `<div class="check-row" style="background:${checked?"#34D39918":"var(--card)"};border-color:${checked?"#34D39944":"#fff2"}" onclick="dbToggleChecked('${item.id}')">
+      <div class="checkbox" style="border-color:${checked?"var(--green)":"var(--muted)"};background:${checked?"var(--green)":"transparent"}">
+        ${checked?`<span style="color:#000;font-size:12px;font-weight:900">✓</span>`:""}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:12px;color:${checked?"var(--muted)":"var(--text)"};text-decoration:${checked?"line-through":"none"}">${item.text}</div>
+      </div>
+      ${STATE.viewOnly?"":`<button onclick="event.stopPropagation(); dbDeleteGearItem('${item.id}')" style="background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:2px 4px;flex-shrink:0">🗑</button>`}
+    </div>`;
+  }).join("");
+
+  return `<div class="sh" style="margin-top:20px">Huntin Camp</div>
+  <div class="warn-banner">⛔ No crew in 2026 — drop bag only</div>
+  <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Mile ${fmtMile(STATIONS[HUNTIN_CAMP_IDX].mile)} · what to pack in the drop bag — your runner grabs it on their own.</div>
+  ${rows || `<div style="text-align:center;padding:10px 0;color:var(--muted);font-size:11px">No drop bag items yet</div>`}
+  ${STATE.viewOnly?"":`<button class="btn sm green" style="width:100%;margin-top:8px" onclick="dbOpenAddGear()">＋ Add drop bag item</button>`}`;
 }
 
 function openQCStation(idx){
@@ -1158,10 +1208,15 @@ function qcToggleGearChecked(key){
 
 let qcAddGearSection = 0;
 let qcAddGearSelected = new Set();
+let qcAddGearReturn = null;
 
-function qcOpenAddGear(idx){
+// onClose lets a caller outside the station-detail modal (e.g. the Huntin
+// Camp drop-bag section) reuse this picker without routing back into
+// renderQCModal, which assumes a station on the crew ETA/fuel flow.
+function qcOpenAddGear(idx, onClose){
   qcAddGearSection = 0;
   qcAddGearSelected = new Set();
+  qcAddGearReturn = onClose || (()=>renderQCModal(idx));
   renderQCAddGearModal(idx);
 }
 
@@ -1211,7 +1266,7 @@ function renderQCAddGearModal(idx){
     <div class="sh">Or add a custom item</div>
     <div class="field"><label>Item *</label><input id="qc-gear-name" placeholder="e.g. Dry socks"></div>
     <div style="display:flex;gap:8px;margin-top:4px">
-      <button class="btn sm muted" onclick="renderQCModal(${idx})">Cancel</button>
+      <button class="btn sm muted" onclick="qcAddGearReturn()">Cancel</button>
       <button class="btn green" onclick="qcSaveGear(${idx})">Add Custom</button>
     </div>`);
 }
@@ -1227,7 +1282,7 @@ function qcAddSelectedGear(idx){
   }, "quickCheck");
   toast(`${toAdd.length} gear item${toAdd.length===1?"":"s"} added`);
   qcAddGearSelected = new Set();
-  renderQCModal(idx);
+  qcAddGearReturn();
   renderTab("quickcheck");
 }
 
@@ -1238,7 +1293,7 @@ function qcSaveGear(idx){
     STATE.quickCheck.gear[idx] = [...(STATE.quickCheck.gear[idx]||[]), {id:uid(), text:name}];
   }, "quickCheck");
   toast("Gear item added");
-  renderQCModal(idx);
+  qcAddGearReturn();
   renderTab("quickcheck");
 }
 
